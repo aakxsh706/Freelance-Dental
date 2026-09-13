@@ -6,6 +6,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import environ
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -17,6 +18,28 @@ environ.Env.read_env(BASE_DIR / ".env")
 SECRET_KEY = env("SECRET_KEY", default="django-insecure-dev-only-change-me")
 DEBUG = env.bool("DEBUG", default=False)
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
+
+# Keys that ship with the project and therefore are not secret. The value in
+# .env.example counts: copying the example file is the normal way to set the
+# backend up, so it is the placeholder most likely to reach production.
+_PLACEHOLDER_SECRET_KEYS = {
+    "django-insecure-dev-only-change-me",
+    "change-this-to-a-long-random-string",
+}
+
+# This database holds patient medical records, so a guessable SECRET_KEY is not
+# a warning to read later - it lets anyone mint a valid session or JWT. Refuse
+# to boot rather than serve patient data with a known key.
+if not DEBUG and (
+    SECRET_KEY in _PLACEHOLDER_SECRET_KEYS
+    or SECRET_KEY.startswith("django-insecure-")
+    or len(SECRET_KEY) < 50
+):
+    raise ImproperlyConfigured(
+        "SECRET_KEY is a placeholder or too short to be safe. Generate one with\n"
+        "  python -c \"import secrets; print(secrets.token_urlsafe(64))\"\n"
+        "and set it in the environment before running with DEBUG=False."
+    )
 
 
 INSTALLED_APPS = [
@@ -130,3 +153,32 @@ CORS_ALLOWED_ORIGINS = env.list(
     default=["http://localhost:6565", "http://127.0.0.1:6565"],
 )
 CORS_ALLOW_CREDENTIALS = True
+
+
+# Uploads
+# Patient documents are x-rays and scans, so the ceiling is generous, but an
+# unbounded upload is a denial-of-service vector.
+DATA_UPLOAD_MAX_MEMORY_SIZE = env.int("MAX_UPLOAD_BYTES", default=25 * 1024 * 1024)
+FILE_UPLOAD_MAX_MEMORY_SIZE = DATA_UPLOAD_MAX_MEMORY_SIZE
+
+
+# Transport security
+# Only applied outside DEBUG so local development over plain HTTP still works.
+# These are defaults, not opinions about the deployment: each can be overridden
+# from the environment for a host that terminates TLS differently.
+
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = "DENY"
+
+if not DEBUG:
+    SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=True)
+    # Behind a reverse proxy Django cannot see the original scheme; without
+    # this it would redirect an already-HTTPS request forever.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=31536000)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool(
+        "SECURE_HSTS_INCLUDE_SUBDOMAINS", default=True
+    )
+    SECURE_HSTS_PRELOAD = env.bool("SECURE_HSTS_PRELOAD", default=True)
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True

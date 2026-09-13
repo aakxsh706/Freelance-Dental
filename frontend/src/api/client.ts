@@ -14,29 +14,68 @@ export class ApiError extends Error {
 }
 
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'
+  method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
   body?: unknown
   auth?: boolean
 }
 
+/** Build a query string, dropping empty values so callers can pass their whole
+ * filter state without pruning it first. */
+export function buildQuery(params: Record<string, string | number | boolean | undefined | null>) {
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === '') continue
+    query.set(key, String(value))
+  }
+  const encoded = query.toString()
+  return encoded ? `?${encoded}` : ''
+}
+
 function extractMessage(body: unknown): string {
   if (!body || typeof body !== 'object') return 'Something went wrong. Please try again.'
-  const values = Object.values(body as Record<string, unknown>)
+  const record = body as Record<string, unknown>
+  // DRF puts permission and auth failures under `detail`; showing that verbatim
+  // is far more useful than a generic message, because it says which role is
+  // required.
+  if (typeof record.detail === 'string') return record.detail
+  const values = Object.values(record)
   const first = values[0]
   if (Array.isArray(first) && typeof first[0] === 'string') return first[0]
   if (typeof first === 'string') return first
   return 'Something went wrong. Please try again.'
 }
 
+/** Field-level errors from a DRF 400, for rendering next to inputs. */
+export function fieldErrors(error: unknown): Record<string, string> {
+  if (!(error instanceof ApiError) || error.status !== 400) return {}
+  const body = error.body
+  if (!body || typeof body !== 'object') return {}
+  const result: Record<string, string> = {}
+  for (const [key, value] of Object.entries(body as Record<string, unknown>)) {
+    if (Array.isArray(value) && typeof value[0] === 'string') result[key] = value[0]
+    else if (typeof value === 'string') result[key] = value
+  }
+  return result
+}
+
 async function rawRequest(path: string, options: RequestOptions, accessToken: string | null) {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const isFormData = options.body instanceof FormData
+  // The browser must set its own multipart boundary, so Content-Type is left
+  // off entirely for uploads rather than set to multipart/form-data.
+  const headers: Record<string, string> = isFormData
+    ? {}
+    : { 'Content-Type': 'application/json' }
   if (options.auth && accessToken) {
     headers.Authorization = `Bearer ${accessToken}`
   }
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: options.method ?? 'GET',
     headers,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    body: isFormData
+      ? (options.body as FormData)
+      : options.body !== undefined
+        ? JSON.stringify(options.body)
+        : undefined,
   })
   return response
 }

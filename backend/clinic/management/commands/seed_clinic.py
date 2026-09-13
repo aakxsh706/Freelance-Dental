@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from clinic.models import ClinicSettings, Dentist, DentistAvailability
+from clinic.models import ClinicSettings, Dentist, DentistAvailability, StaffProfile
 
 DEFAULT_HOURS = [
     (time(9, 0), time(13, 0)),
@@ -17,8 +17,8 @@ DEFAULT_WORKING_DAYS = range(0, 6)
 
 class Command(BaseCommand):
     help = (
-        "Seed the single dentist login, default clinic settings, and default "
-        "working hours. Safe to re-run; existing data is left untouched."
+        "Seed the dentist login and staff role, default clinic settings, and "
+        "default working hours. Safe to re-run; existing data is left untouched."
     )
 
     @transaction.atomic
@@ -68,6 +68,31 @@ class Command(BaseCommand):
         if dentist_created:
             self.stdout.write(self.style.SUCCESS("Created dentist profile."))
 
+        # The clinic software authorises by role, so the dentist needs a staff
+        # profile as well as a Dentist record - without it they could sign in
+        # but reach none of the internal screens.
+        staff, staff_created = StaffProfile.objects.get_or_create(
+            user=user,
+            defaults={
+                "full_name": dentist.name,
+                "role": StaffProfile.Role.DENTIST,
+                "phone": dentist.phone,
+                "is_active": True,
+            },
+        )
+        if staff_created:
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Created staff profile for '{username}' with the dentist role "
+                    "(full access, including clinical records and the audit trail)."
+                )
+            )
+        else:
+            self.stdout.write(
+                f"Staff profile for '{username}' already exists "
+                f"(role: {staff.get_role_display()}) - left as-is."
+            )
+
         settings_obj = ClinicSettings.load()
         if settings_obj.address.startswith("Clinic Address"):
             self.stdout.write(
@@ -91,3 +116,8 @@ class Command(BaseCommand):
             self.stdout.write("Working hours already configured - left as-is.")
 
         self.stdout.write(self.style.SUCCESS("Seed complete."))
+        self.stdout.write(
+            "Additional staff (assistants, reception) are added in the Django "
+            "admin: create the user, then give them a Staff profile with the "
+            "appropriate role."
+        )

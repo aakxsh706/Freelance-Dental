@@ -1,21 +1,25 @@
 import type { FormEvent } from 'react'
 import { useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { login } from '../api/auth'
+import { getCurrentStaff } from '../api/staff'
 import { ApiError } from '../api/client'
 import { Button } from '../components/ui/Button'
 import { useAuthStore } from '../stores/authStore'
 
 export function LoginPage() {
   const navigate = useNavigate()
-  const { isAuthenticated, setTokens } = useAuthStore()
+  const location = useLocation()
+  const { isAuthenticated, setTokens, setStaff } = useAuthStore()
+  // ClinicRoute records where the user was going before being bounced here.
+  const destination = (location.state as { from?: string } | null)?.from ?? '/clinic/dashboard'
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   if (isAuthenticated) {
-    return <Navigate to="/dentist/dashboard" replace />
+    return <Navigate to={destination} replace />
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -25,7 +29,15 @@ export function LoginPage() {
     try {
       const tokens = await login(username, password)
       setTokens(tokens)
-      navigate('/dentist/dashboard')
+      // Load the role before navigating so the sidebar renders the correct
+      // items on first paint rather than flashing and then filtering.
+      try {
+        setStaff(await getCurrentStaff())
+      } catch {
+        // A valid login without a staff profile still reaches the app, where
+        // ClinicRoute handles it; failing to read the role is not a login error.
+      }
+      navigate(destination)
     } catch (err) {
       setError(
         err instanceof ApiError && err.status === 401
@@ -50,7 +62,7 @@ export function LoginPage() {
           Dentist Login
         </h1>
         <p className="mb-6 text-center text-sm text-(--color-ink-soft)">
-          Sign in to manage appointments and availability.
+          Sign in to the clinic management software.
         </p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">

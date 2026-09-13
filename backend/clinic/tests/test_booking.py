@@ -5,7 +5,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import Appointment, DentistAvailability
+from ..models import Appointment, DentistAvailability, StaffProfile
 
 
 def next_weekday(target_weekday: int) -> date:
@@ -85,10 +85,67 @@ class AvailabilityAndBookingTests(APITestCase):
         response = self.client.get(reverse("appointment-list"))
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
-    def test_authenticated_dentist_can_list_appointments(self):
+    def test_authenticated_staff_can_list_appointments(self):
         self._book()
         user = get_user_model().objects.create_user(username="drtest", password="pw12345!")
+        # Listing appointments now requires a clinic staff role, not merely a
+        # login. Reception is the lowest role that schedules, so it is the
+        # right floor for this endpoint.
+        StaffProfile.objects.create(
+            user=user, full_name="Dr Test", role=StaffProfile.Role.RECEPTIONIST
+        )
         self.client.force_authenticate(user=user)
         response = self.client.get(reverse("appointment-list"))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
+
+    def test_login_without_a_staff_profile_cannot_read_appointments(self):
+        """A bare account is not a clinic account.
+
+        Patient data must not be reachable just because someone has any valid
+        login; access is granted by role.
+        """
+        self._book()
+        user = get_user_model().objects.create_user(username="nobody", password="pw12345!")
+        self.client.force_authenticate(user=user)
+        response = self.client.get(reverse("appointment-list"))
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_appointment_list_is_an_array_without_a_page_parameter(self):
+        """The original dashboard expects a bare array.
+
+        Pagination was added for the clinic software; this guards the old
+        contract against it being switched on globally.
+        """
+        self._book()
+        user = get_user_model().objects.create_user(username="drtest2", password="pw12345!")
+        StaffProfile.objects.create(
+            user=user, full_name="Dr Test", role=StaffProfile.Role.DENTIST
+        )
+        self.client.force_authenticate(user=user)
+        response = self.client.get(reverse("appointment-list"))
+        self.assertIsInstance(response.data, list)
+
+        paged = self.client.get(reverse("appointment-list"), {"page": 1})
+        self.assertIn("results", paged.data)
+        self.assertIn("count", paged.data)
+
+    def test_no_show_releases_the_slot(self):
+        """A missed appointment frees its time, like a cancellation.
+
+        The database constraint and availability.py must agree on this, or a
+        slot shows as free and then refuses the booking.
+        """
+        first = self._book()
+        appointment = Appointment.objects.get(id=first.data["id"])
+        appointment.status = Appointment.Status.NO_SHOW
+        appointment.save()
+
+        availability = self.client.get(
+            reverse("availability"), {"date": self.monday.isoformat()}
+        )
+        slot = next(s for s in availability.data["slots"] if s["time"] == "09:00")
+        self.assertEqual(slot["status"], "available")
+
+        second = self._book(patient_name="Second Patient")
+        self.assertEqual(second.status_code, status.HTTP_201_CREATED)

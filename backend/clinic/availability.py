@@ -5,6 +5,10 @@ so the rules for "what counts as an open slot" live in exactly one place:
 working days/hours (DentistAvailability), holidays/leave (BlockedDate),
 the configurable slot length (ClinicSettings), and existing bookings
 (Appointment) can all change independently without touching this logic.
+
+Which statuses still hold a slot is defined once, on the Appointment model, as
+SLOT_RELEASING_STATUSES. This module and the database unique constraint both
+read it, so "is this slot free" cannot drift between the two.
 """
 
 from datetime import date as date_cls
@@ -41,7 +45,7 @@ def compute_available_slots(target_date: date_cls) -> list[dict]:
 
     booked_times = set(
         Appointment.objects.filter(appointment_date=target_date)
-        .exclude(status=Appointment.Status.CANCELLED)
+        .exclude(status__in=Appointment.SLOT_RELEASING_STATUSES)
         .values_list("appointment_time", flat=True)
     )
 
@@ -83,7 +87,7 @@ def slot_is_available(target_date: date_cls, target_time) -> bool:
 
     already_booked = (
         Appointment.objects.filter(appointment_date=target_date, appointment_time=target_time)
-        .exclude(status=Appointment.Status.CANCELLED)
+        .exclude(status__in=Appointment.SLOT_RELEASING_STATUSES)
         .exists()
     )
     return not already_booked

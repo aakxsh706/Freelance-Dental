@@ -102,37 +102,3 @@ class BlockedDate(models.Model):
 
     def __str__(self) -> str:
         return f"{self.date} ({self.reason})" if self.reason else str(self.date)
-
-
-class Appointment(models.Model):
-    class Status(models.TextChoices):
-        PENDING = "pending", "Pending"
-        CONFIRMED = "confirmed", "Confirmed"
-        COMPLETED = "completed", "Completed"
-        CANCELLED = "cancelled", "Cancelled"
-
-    patient_name = models.CharField(max_length=150)
-    phone = models.CharField(max_length=30)
-    email = models.EmailField(blank=True)
-    reason = models.CharField(max_length=255)
-    appointment_date = models.DateField()
-    appointment_time = models.TimeField()
-    notes = models.TextField(blank=True)
-    status = models.CharField(
-        max_length=20, choices=Status.choices, default=Status.PENDING
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ["appointment_date", "appointment_time"]
-        constraints = [
-            models.UniqueConstraint(
-                fields=["appointment_date", "appointment_time"],
-                condition=~models.Q(status="cancelled"),
-                name="unique_active_appointment_slot",
-            )
-        ]
-
-    def __str__(self) -> str:
-        return f"{self.patient_name} - {self.appointment_date} {self.appointment_time}"
