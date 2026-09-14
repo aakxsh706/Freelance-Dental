@@ -1,6 +1,6 @@
 import { Clock, Mail, MapPin, Phone } from 'lucide-react'
 import { getClinicSettings } from '../../api/clinic'
-import { fallbackClinicSettings } from '../../data/clinicConfig'
+import { clinicTimings, fallbackClinicSettings } from '../../data/clinicConfig'
 import { useFetch } from '../../hooks/useFetch'
 import { telHref } from '../../lib/format'
 import { Container } from '../ui/Container'
@@ -15,7 +15,11 @@ export function ContactSection() {
     { icon: Phone, label: 'Phone', value: clinic.phone, href: telHref(clinic.phone) },
     { icon: Mail, label: 'Email', value: clinic.email, href: `mailto:${clinic.email}` },
     { icon: MapPin, label: 'Address', value: clinic.address },
-    { icon: Clock, label: 'Hours', value: 'Mon–Sat, sample hours — see Appointment page' },
+    {
+      icon: Clock,
+      label: 'Hours',
+      value: `Mon–Sat, ${clinicTimings.map((session) => session.hours).join(' & ')}`,
+    },
   ]
 
   return (

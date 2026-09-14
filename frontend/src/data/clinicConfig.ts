@@ -9,11 +9,12 @@ import type { ClinicSettings, Dentist } from '../types'
  */
 export const fallbackClinicSettings: ClinicSettings = {
   clinic_name: "Belin's Dental Clinic",
-  phone: '+91 XXXXX XXXXX',
-  email: 'info@belinsdental.example',
-  address: 'Clinic Address — Placeholder, City, State, PIN',
+  phone: '+91 88707 74432',
+  email: 'drbelinroshia@gmail.com',
+  address:
+    '23, SS Towers, Sarkar Samakulam Sathy Road, Kurumbapalayam, 641107, Sarcarsamakulam, Tamil Nadu 641035',
   google_maps_embed_url: '',
-  google_maps_url: '',
+  google_maps_url: 'https://maps.app.goo.gl/1sA41VZLgnzXNse86',
   slot_duration_minutes: 30,
 }
 
@@ -22,7 +23,7 @@ export const fallbackDentist: Dentist = {
   name: 'Dr. Belin [Placeholder]',
   title: 'Dentist & Oral Healthcare Professional',
   email: '',
-  phone: '+91 XXXXX XXXXX',
+  phone: '+91 88707 74432',
   bio: 'Dr. Belin focuses on patient comfort, preventive care, and clear communication — helping every patient understand their treatment options and make confident decisions about their oral health for the long term.',
   profile_image: '',
 }
@@ -32,4 +33,13 @@ export const clinicNavLinks = [
   { label: 'Appointment', href: '#appointment' },
   { label: 'About', href: '#about' },
   { label: 'Contact Us', href: '#contact' },
+]
+
+/** Static display copy for the clinic's two daily sessions — keep in sync
+ * with the DentistAvailability windows configured on the backend
+ * (clinic/migrations/0002_real_clinic_info_and_hours.py / the dentist
+ * dashboard's Availability manager). */
+export const clinicTimings = [
+  { label: 'Morning', hours: '10:00 AM – 2:00 PM' },
+  { label: 'Evening', hours: '4:30 PM – 8:00 PM' },
 ]

@@ -16,7 +16,7 @@ export function LocationMap() {
       <Container className="flex flex-col gap-10">
         <Reveal className="mx-auto">
           <SectionHeading
-            eyebrow="Clinic Location — Placeholder"
+            eyebrow="Clinic Location"
             title="Visit Our Clinic"
             description={clinic.address}
           />

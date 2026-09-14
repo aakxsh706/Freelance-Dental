@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { AppointmentForm } from '../components/appointment/AppointmentForm'
+import { HappyToothCompanion } from '../components/appointment/HappyToothCompanion'
 import { StepIndicator } from '../components/appointment/StepIndicator'
 import { Container } from '../components/ui/Container'
 import { useBookingStore, type PatientDetails } from '../stores/bookingStore'
@@ -28,12 +29,15 @@ export function AppointmentPage() {
           </p>
         </div>
 
-        <div className="mx-auto w-full max-w-2xl rounded-2xl border border-(--color-border) bg-(--color-bg) p-6 sm:p-10">
-          <AppointmentForm
-            initialDetails={details}
-            initialPreferredDate={preferredDate}
-            onContinue={handleContinue}
-          />
+        <div className="mx-auto flex w-full max-w-4xl flex-col-reverse gap-8 lg:flex-row lg:items-start">
+          <div className="w-full rounded-2xl border border-(--color-border) bg-(--color-bg) p-6 sm:p-10 lg:max-w-2xl">
+            <AppointmentForm
+              initialDetails={details}
+              initialPreferredDate={preferredDate}
+              onContinue={handleContinue}
+            />
+          </div>
+          <HappyToothCompanion state="initial" className="lg:w-56 lg:flex-none lg:pt-6" />
         </div>
       </Container>
     </section>

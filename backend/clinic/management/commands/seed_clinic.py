@@ -8,8 +8,8 @@ from django.db import transaction
 from clinic.models import ClinicSettings, Dentist, DentistAvailability
 
 DEFAULT_HOURS = [
-    (time(9, 0), time(13, 0)),
-    (time(16, 0), time(20, 0)),
+    (time(10, 0), time(14, 0)),
+    (time(16, 30), time(20, 0)),
 ]
 # Monday(0) - Saturday(5) open with the default split shift; Sunday(6) closed.
 DEFAULT_WORKING_DAYS = range(0, 6)
@@ -55,7 +55,7 @@ class Command(BaseCommand):
                 "name": "Dr. Belin [Placeholder]",
                 "title": "Dentist & Oral Healthcare Professional",
                 "email": email,
-                "phone": "+91 XXXXX XXXXX",
+                "phone": "+91 88707 74432",
                 "bio": (
                     "Dr. Belin focuses on patient comfort, preventive care, and "
                     "clear communication — helping every patient understand their "
@@ -83,8 +83,8 @@ class Command(BaseCommand):
                     )
             self.stdout.write(
                 self.style.SUCCESS(
-                    "Created default working hours: Mon-Sat, 09:00-13:00 and 16:00-20:00 "
-                    "(sample values - adjust from the dentist dashboard or admin)."
+                    "Created default working hours: Mon-Sat, 10:00-14:00 and 16:30-20:00 "
+                    "(adjust from the dentist dashboard or admin if this changes)."
                 )
             )
         else:
