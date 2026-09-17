@@ -1,6 +1,6 @@
 import { Sparkles } from 'lucide-react'
 import type { RefObject } from 'react'
-import belinDentalLogo from '../../assets/BelinDental_Logo.jpeg'
+import belinDentalLogo from '../../assets/BelinDental_Logo_transparent.png'
 import { useSectionNav } from '../../hooks/useSectionNav'
 import { Button } from '../ui/Button'
 import { Container } from '../ui/Container'
@@ -19,7 +19,7 @@ export function Hero({ onStartTour, tourButtonRef }: HeroProps) {
       <Container className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
         <Reveal className="flex flex-col gap-7">
           <span className="text-xs font-semibold uppercase tracking-[0.2em] text-(--color-accent)">
-            Belin&rsquo;s Dental Clinic
+            Dr. Belin&rsquo;s Dentistry
           </span>
           <h1 className="text-4xl font-semibold leading-[1.1] text-(--color-ink) sm:text-5xl lg:text-6xl">
             A healthier smile begins with the right care.
@@ -53,19 +53,19 @@ export function Hero({ onStartTour, tourButtonRef }: HeroProps) {
         <Reveal delay={120}>
           {/* Official clinic branding — deliberately not routed through
               <ToothMascot>, which is reserved for the character
-              illustrations elsewhere on the site. The container's
-              background is sampled from the logo artwork itself so its own
-              flat backdrop blends in seamlessly instead of showing a
-              mismatched white seam. */}
-          <div className="flex aspect-[4/5] w-full items-center justify-center rounded-2xl border border-(--color-border) bg-[#dddad5] sm:aspect-[5/4] lg:aspect-[4/5]">
-            <div className="flex h-full w-full items-center justify-center p-10 sm:p-14">
-              <img
-                src={belinDentalLogo}
-                alt="Belin's Dental Clinic logo"
-                draggable={false}
-                className="h-full w-full select-none object-contain"
-              />
-            </div>
+              illustrations elsewhere on the site. Uses a transparent PNG
+              (BelinDental_Logo_transparent.png, generated once from the
+              supplied BelinDental_Logo.jpeg by keying out its flat gray
+              background — the ink artwork itself is pixel-for-pixel
+              unaltered) so the logo sits directly on the Hero's own
+              background with no card/box behind it. */}
+          <div className="flex aspect-[4/5] w-full items-center justify-center p-10 sm:aspect-[5/4] sm:p-14 lg:aspect-[4/5]">
+            <img
+              src={belinDentalLogo}
+              alt="Dr. Belin's Dentistry logo"
+              draggable={false}
+              className="h-full w-full select-none object-contain"
+            />
           </div>
         </Reveal>
       </Container>

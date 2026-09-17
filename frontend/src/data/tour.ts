@@ -12,7 +12,7 @@ export const tourSteps: TourStep[] = [
   {
     id: 'welcome',
     target: null,
-    title: "Welcome to Belin's Dental Clinic",
+    title: "Welcome to Dr. Belin's Dentistry",
     description:
       "Let your smile guide show you around. In just a few steps, I'll show you how to explore our care and book your visit.",
     ctaLabel: 'Next',

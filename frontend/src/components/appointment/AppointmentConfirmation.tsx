@@ -88,7 +88,7 @@ export function AppointmentConfirmation({ appointment }: { appointment: Appointm
             resolves back to the card's own color while black stays black. */}
         <img
           src={belinLocationQr}
-          alt="QR code to open Belin's Dental Clinic location"
+          alt="QR code to open Dr. Belin's Dentistry location"
           draggable={false}
           className="h-36 w-36 object-contain sm:h-40 sm:w-40"
           style={{ mixBlendMode: 'multiply' }}

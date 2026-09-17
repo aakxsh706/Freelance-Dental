@@ -28,14 +28,14 @@ class Dentist(models.Model):
 class ClinicSettings(models.Model):
     """Singleton-style model holding clinic-wide contact/location info."""
 
-    clinic_name = models.CharField(max_length=200, default="Belin's Dental Clinic")
+    clinic_name = models.CharField(max_length=200, default="Dr. Belin's Dentistry")
     phone = models.CharField(max_length=30, default="+91 88707 74432")
     email = models.EmailField(blank=True, default="drbelinroshia@gmail.com")
     address = models.CharField(
         max_length=300,
         default=(
-            "23, SS Towers, Sarkar Samakulam Sathy Road, Kurumbapalayam, "
-            "641107, Sarcarsamakulam, Tamil Nadu 641035"
+            "No. 23, SS Towers, Kurumbapalayam, Sathy road, "
+            "Sarkarsamakulam PO, Coimbatore 641107, Tamilnadu"
         ),
     )
     google_maps_embed_url = models.URLField(

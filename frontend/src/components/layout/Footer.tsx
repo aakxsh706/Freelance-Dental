@@ -24,7 +24,7 @@ export function Footer() {
       <Container className="grid gap-10 py-14 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <Link to="/" className="font-display text-lg font-semibold text-(--color-ink)">
-            Belin&rsquo;s Dental Clinic
+            Dr. Belin&rsquo;s Dentistry
           </Link>
           <p className="mt-3 max-w-xs text-sm leading-relaxed text-(--color-ink-soft)">
             Personalized dental care designed around your comfort, confidence, and long-term
@@ -73,7 +73,7 @@ export function Footer() {
       <div className="border-t border-(--color-border) py-6">
         <Container>
           <p className="text-center text-xs text-(--color-ink-faint)">
-            © 2026 Belin&rsquo;s Dental Clinic. All rights reserved.
+            © 2026 Dr. Belin&rsquo;s Dentistry. All rights reserved.
           </p>
         </Container>
       </div>

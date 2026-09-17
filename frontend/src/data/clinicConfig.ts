@@ -8,11 +8,11 @@ import type { ClinicSettings, Dentist } from '../types'
  * mismatched placeholder content.
  */
 export const fallbackClinicSettings: ClinicSettings = {
-  clinic_name: "Belin's Dental Clinic",
+  clinic_name: "Dr. Belin's Dentistry",
   phone: '+91 88707 74432',
   email: 'drbelinroshia@gmail.com',
   address:
-    '23, SS Towers, Sarkar Samakulam Sathy Road, Kurumbapalayam, 641107, Sarcarsamakulam, Tamil Nadu 641035',
+    'No. 23, SS Towers, Kurumbapalayam, Sathy road, Sarkarsamakulam PO, Coimbatore 641107, Tamilnadu',
   google_maps_embed_url: '',
   google_maps_url: 'https://maps.app.goo.gl/1sA41VZLgnzXNse86',
   slot_duration_minutes: 30,

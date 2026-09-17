@@ -29,7 +29,7 @@ export function LocationMap() {
             </div>
           ) : hasRealEmbed ? (
             <iframe
-              title="Belin's Dental Clinic location"
+              title="Dr. Belin's Dentistry location"
               src={clinic.google_maps_embed_url}
               className="aspect-[16/7] w-full rounded-2xl border border-(--color-border)"
               loading="lazy"

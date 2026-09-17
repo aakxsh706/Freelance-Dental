@@ -11,7 +11,7 @@ export function WhyChooseUs() {
       <Container className="flex flex-col gap-14">
         <Reveal className="mx-auto flex flex-col items-center gap-3">
           <ToothMascot type="superhero" frame="standing" size="sm" className="lg:hidden" />
-          <SectionHeading title="Why Patients Choose Belin's Dental Clinic" />
+          <SectionHeading title="Why Patients Choose Dr. Belin's Dentistry" />
           <p className="text-sm italic text-(--color-ink-faint)">
             Your smile deserves a little superhero care.
           </p>
