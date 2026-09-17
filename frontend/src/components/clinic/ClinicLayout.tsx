@@ -96,7 +96,7 @@ export function ClinicLayout({ children }: { children: ReactNode }) {
         <Activity className="h-5 w-5 text-(--color-accent)" strokeWidth={2} />
         <div className="min-w-0">
           <p className="truncate font-display text-sm font-semibold text-(--color-ink)">
-            Belin&rsquo;s Dental Clinic
+            Dr. Belin&rsquo;s Dentistry
           </p>
           <p className="text-xs text-(--color-ink-faint)">Clinic Management</p>
         </div>
@@ -161,7 +161,7 @@ export function ClinicLayout({ children }: { children: ReactNode }) {
             <Menu className="h-5 w-5" />
           </button>
           <p className="font-display text-sm font-semibold text-(--color-ink)">
-            Belin&rsquo;s Dental Clinic
+            Dr. Belin&rsquo;s Dentistry
           </p>
         </header>
 

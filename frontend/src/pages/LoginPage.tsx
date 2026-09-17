@@ -56,7 +56,7 @@ export function LoginPage() {
           to="/"
           className="mb-8 block text-center font-display text-lg font-semibold text-(--color-ink)"
         >
-          Belin&rsquo;s Dental Clinic
+          Dr. Belin&rsquo;s Dentistry
         </Link>
         <h1 className="mb-1 text-center text-xl font-semibold text-(--color-ink)">
           Dentist Login

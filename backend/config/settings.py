@@ -1,5 +1,5 @@
 """
-Django settings for the Belin's Dental Clinic backend.
+Django settings for the Dr. Belin's Dentistry backend.
 """
 
 from datetime import timedelta
@@ -192,7 +192,7 @@ EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
 EMAIL_USE_SSL = env.bool("EMAIL_USE_SSL", default=False)
 EMAIL_TIMEOUT = env.int("EMAIL_TIMEOUT", default=10)
 DEFAULT_FROM_EMAIL = env(
-    "DEFAULT_FROM_EMAIL", default="Belin's Dental Clinic <no-reply@belinsdental.example>"
+    "DEFAULT_FROM_EMAIL", default="Dr. Belin's Dentistry <no-reply@belinsdental.example>"
 )
 
 

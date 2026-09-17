@@ -88,3 +88,121 @@ h4 {
     animation: none;
   }
 }
+
+/* SmileTour entrance — opacity only, never transform, so it can never fight
+   the panel/spotlight's own position-driven transform on the same element. */
+@keyframes tour-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.tour-fade-in {
+  animation: tour-fade-in 250ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-fade-in {
+    animation: none;
+  }
+}
+
+/* Service detail popup entrance — opacity plus a small scale-up. Unlike
+   SmileTour's panel, this one carries no JS-driven transform of its own
+   (it's centered with flexbox, not translate), so a CSS transform here
+   can't collide with anything. */
+@keyframes service-modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.service-modal-in {
+  animation: service-modal-in 220ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .service-modal-in {
+    animation: none;
+  }
+}
+
+/* Success sparkles — a brief, restrained burst (never a looping effect). */
+@keyframes mascot-sparkle {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.4);
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: var(--sparkle-end, translate(0, -14px) scale(1));
+  }
+}
+
+.mascot-sparkle {
+  animation: mascot-sparkle 1100ms ease-out both;
+}
+
+.message-fade-in {
+  animation: tour-fade-in 350ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mascot-sparkle {
+    display: none;
+  }
+  .message-fade-in {
+    animation: none;
+  }
+}
+
+/* Dental floss indicator's idle breathing — deliberately smaller than
+   .mascot-float (this is a ~36px icon, not a standing character), and
+   applied on an inner layer separate from the scroll-position transform so
+   the two never fight over the same element's `transform`. Toggled on only
+   once scrolling has settled (see DentalFlossIndicator). */
+@keyframes floss-mascot-idle {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-2px) rotate(-1.5deg);
+  }
+}
+
+.floss-mascot-idle {
+  animation: floss-mascot-idle 3.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .floss-mascot-idle {
+    animation: none;
+  }
+}
+
+/* The floss line itself — a single continuous thread whose "travelled"
+   portion (above the tooth) reads very slightly darker than the portion
+   still ahead, updated via the --floss-progress custom property rather than
+   a second overlaid element. Intentionally muted, never a solid progress-bar
+   color, so it stays floss rather than a scrollbar. */
+.floss-line {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--color-accent) 50%, transparent) 0%,
+    color-mix(in srgb, var(--color-accent) 50%, transparent) var(--floss-progress, 0%),
+    var(--color-border) var(--floss-progress, 0%),
+    var(--color-border) 100%
+  );
+}

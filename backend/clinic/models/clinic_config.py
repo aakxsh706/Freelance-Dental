@@ -28,12 +28,15 @@ class Dentist(models.Model):
 class ClinicSettings(models.Model):
     """Singleton-style model holding clinic-wide contact/location info."""
 
-    clinic_name = models.CharField(max_length=200, default="Belin's Dental Clinic")
-    phone = models.CharField(max_length=30, default="+91 XXXXX XXXXX")
-    email = models.EmailField(blank=True, default="info@belinsdental.example")
+    clinic_name = models.CharField(max_length=200, default="Dr. Belin's Dentistry")
+    phone = models.CharField(max_length=30, default="+91 88707 74432")
+    email = models.EmailField(blank=True, default="drbelinroshia@gmail.com")
     address = models.CharField(
         max_length=300,
-        default="Clinic Address — Placeholder, City, State, PIN",
+        default=(
+            "No. 23, SS Towers, Kurumbapalayam, Sathy road, "
+            "Sarkarsamakulam PO, Coimbatore 641107, Tamilnadu"
+        ),
     )
     google_maps_embed_url = models.URLField(
         blank=True,
@@ -41,6 +44,7 @@ class ClinicSettings(models.Model):
     )
     google_maps_url = models.URLField(
         blank=True,
+        default="https://maps.app.goo.gl/1sA41VZLgnzXNse86",
         help_text="Link to open the clinic location in Google Maps.",
     )
     slot_duration_minutes = models.PositiveIntegerField(default=30)

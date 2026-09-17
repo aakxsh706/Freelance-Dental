@@ -1,10 +1,13 @@
 import type { LucideIcon } from 'lucide-react'
 import {
+  Anchor,
   Baby,
   Hammer,
   Heart,
+  Layers,
   Scissors,
   Smile,
+  SmilePlus,
   Sparkles,
   Stethoscope,
   Wrench,
@@ -24,9 +27,9 @@ export const services: Service[] = [
     icon: Stethoscope,
   },
   {
-    title: 'Teeth Cleaning',
+    title: 'Teeth Cleaning (Scaling)',
     description:
-      'Professional cleaning to remove plaque, tartar, and stains while maintaining healthy gums.',
+      'Scaling is a professional cleaning that removes plaque and hardened tartar from your teeth and along the gum line, helping keep your teeth and gums healthy.',
     icon: Sparkles,
   },
   {
@@ -40,13 +43,15 @@ export const services: Service[] = [
     icon: Wrench,
   },
   {
-    title: 'Root Canal Treatment',
-    description: 'Comfort-focused treatment to save infected or damaged teeth.',
+    title: 'Root Canal',
+    description:
+      'A root canal treats an infected or badly damaged tooth by removing the infection from inside the tooth and protecting it so the tooth can be preserved.',
     icon: Heart,
   },
   {
-    title: 'Dental Crowns',
-    description: 'Restoration and protection for damaged or weakened teeth.',
+    title: 'Dental Crown + Bridges',
+    description:
+      'Crowns help protect and restore damaged or weakened teeth. Bridges replace one or more missing teeth by supporting a replacement tooth with nearby teeth.',
     icon: Hammer,
   },
   {
@@ -58,5 +63,23 @@ export const services: Service[] = [
     title: "Children's Dentistry",
     description: 'Gentle dental care designed to make dental visits comfortable for children.',
     icon: Baby,
+  },
+  {
+    title: 'Implants',
+    description:
+      'Dental implants are replacement tooth roots that support a natural-looking artificial tooth, helping restore both function and appearance.',
+    icon: Anchor,
+  },
+  {
+    title: 'Orthobraces + Aligners, Invisalign',
+    description:
+      'Braces and clear aligners gradually move teeth into better alignment, helping improve your bite and create a straighter, healthier-looking smile.',
+    icon: SmilePlus,
+  },
+  {
+    title: 'Denture',
+    description:
+      'Dentures are removable dental appliances used to replace several missing teeth or a complete set of teeth, helping restore your smile and everyday function.',
+    icon: Layers,
   },
 ]

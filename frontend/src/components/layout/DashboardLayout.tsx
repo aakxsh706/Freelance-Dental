@@ -18,7 +18,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4 sm:px-8">
           <div>
             <p className="font-display text-base font-semibold text-(--color-ink)">
-              Belin&rsquo;s Dental Clinic
+              Dr. Belin&rsquo;s Dentistry
             </p>
             <p className="text-xs text-(--color-ink-faint)">Dentist Dashboard</p>
           </div>

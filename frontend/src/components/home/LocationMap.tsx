@@ -16,7 +16,7 @@ export function LocationMap() {
       <Container className="flex flex-col gap-10">
         <Reveal className="mx-auto">
           <SectionHeading
-            eyebrow="Clinic Location — Placeholder"
+            eyebrow="Clinic Location"
             title="Visit Our Clinic"
             description={clinic.address}
           />
@@ -29,7 +29,7 @@ export function LocationMap() {
             </div>
           ) : hasRealEmbed ? (
             <iframe
-              title="Belin's Dental Clinic location"
+              title="Dr. Belin's Dentistry location"
               src={clinic.google_maps_embed_url}
               className="aspect-[16/7] w-full rounded-2xl border border-(--color-border)"
               loading="lazy"

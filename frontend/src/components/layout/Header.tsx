@@ -30,7 +30,7 @@ export function Header() {
     <header className="sticky top-0 z-50 border-b border-(--color-border) bg-(--color-bg)/90 backdrop-blur">
       <div className="mx-auto flex h-18 max-w-6xl items-center justify-between px-6 py-4 sm:px-8">
         <Link to="/" className="font-display text-lg font-semibold text-(--color-ink) sm:text-xl">
-          Belin&rsquo;s Dental Clinic
+          Dr. Belin&rsquo;s Dentistry
         </Link>
 
         <nav className="hidden items-center gap-8 lg:flex">

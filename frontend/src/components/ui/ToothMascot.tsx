@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { mascots, type MascotType } from '../../data/mascots'
 
 type MascotSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl'
@@ -20,6 +21,10 @@ interface ToothMascotProps {
   decorative?: boolean
   alt?: string
   className?: string
+  /** Escape hatch for a caller-driven transform (e.g. the Services section
+   * nudging the mascot toward a hovered card) — only applied to the
+   * 'standing' frame's outer element, which already carries the transition. */
+  style?: CSSProperties
 }
 
 const badgeSizeClasses: Record<MascotSize, string> = {
@@ -57,6 +62,7 @@ export function ToothMascot({
   decorative = true,
   alt,
   className = '',
+  style,
 }: ToothMascotProps) {
   const mascot = mascots[type]
   const resolvedAlt = decorative ? '' : (alt ?? mascot.alt)
@@ -64,6 +70,7 @@ export function ToothMascot({
   if (frame === 'standing') {
     return (
       <span
+        style={style}
         className={`mascot-float-wrap relative inline-block ${standingSizeClasses[size]} ${animated ? 'mascot-float' : ''} transition-transform duration-300 ease-out ${className}`}
       >
         <span
