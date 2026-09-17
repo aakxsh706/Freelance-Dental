@@ -6,6 +6,7 @@ works mostly in `patients` and `clinical`. Everything is re-exported here so
 `from clinic.models import X` keeps working exactly as before the split.
 """
 
+from .appointment_events import AppointmentHistory, AppointmentNotification
 from .audit import AuditLog
 from .base import TimeStampedModel, UUIDModel
 from .clinic_config import BlockedDate, ClinicSettings, Dentist, DentistAvailability
@@ -33,6 +34,8 @@ from .staff import StaffProfile
 __all__ = [
     "Allergy",
     "Appointment",
+    "AppointmentHistory",
+    "AppointmentNotification",
     "AuditLog",
     "BlockedDate",
     "ClinicSettings",

@@ -155,6 +155,35 @@ CORS_ALLOWED_ORIGINS = env.list(
 CORS_ALLOW_CREDENTIALS = True
 
 
+# Email
+# Appointment confirmations, reschedules and cancellations. Credentials come
+# from the environment only - an SMTP password in source control is a password
+# in every clone of the repository.
+#
+# Development defaults to the console backend, so the whole notification
+# workflow (including the failure paths) can be exercised without an SMTP
+# server and without ever emailing a real patient by accident.
+
+EMAIL_BACKEND = env(
+    "EMAIL_BACKEND",
+    default=(
+        "django.core.mail.backends.console.EmailBackend"
+        if DEBUG
+        else "django.core.mail.backends.smtp.EmailBackend"
+    ),
+)
+EMAIL_HOST = env("EMAIL_HOST", default="")
+EMAIL_PORT = env.int("EMAIL_PORT", default=587)
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
+EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
+EMAIL_USE_SSL = env.bool("EMAIL_USE_SSL", default=False)
+EMAIL_TIMEOUT = env.int("EMAIL_TIMEOUT", default=10)
+DEFAULT_FROM_EMAIL = env(
+    "DEFAULT_FROM_EMAIL", default="Belin's Dental Clinic <no-reply@belinsdental.example>"
+)
+
+
 # Uploads
 # Patient documents are x-rays and scans, so the ceiling is generous, but an
 # unbounded upload is a denial-of-service vector.

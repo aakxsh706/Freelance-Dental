@@ -7,24 +7,29 @@ synchronisation step between the two.
 
 from datetime import date as date_cls, timedelta
 
-from django.db.models import Q
+from django.db.models import Count, Prefetch, Q
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
+from ..appointment_events import record_event
 from ..audit import record_audit, summarize_changes
 from ..matching import build_patient_from_booking, normalize_phone
-from ..models import Appointment, Patient
+from ..models import Appointment, AppointmentNotification, Patient
 from ..permissions import IsClinicStaff
 from ..serializers import (
     AppointmentCreateSerializer,
+    ConflictingAppointmentSerializer,
+    SlotConflict,
     AppointmentResolvePatientSerializer,
     AppointmentSerializer,
     AppointmentStatusUpdateSerializer,
     PatientSerializer,
     StaffAppointmentWriteSerializer,
 )
+from ..permissions import can_override_slot
+from .appointment_actions import AppointmentActionsMixin, WalkInMixin
 from .mixins import OptInPageNumberPagination
 
 AUDIT_FIELDS = (
@@ -37,7 +42,7 @@ AUDIT_FIELDS = (
 )
 
 
-class AppointmentViewSet(viewsets.ModelViewSet):
+class AppointmentViewSet(AppointmentActionsMixin, WalkInMixin, viewsets.ModelViewSet):
     """
     - create: public (a patient booking an appointment)
     - everything else: clinic staff
@@ -46,7 +51,21 @@ class AppointmentViewSet(viewsets.ModelViewSet):
     there is no import step, because both surfaces read the same table.
     """
 
-    queryset = Appointment.objects.select_related("patient").all()
+    queryset = (
+        Appointment.objects.select_related("patient", "confirmed_by", "checked_in_by")
+        .prefetch_related(
+            Prefetch(
+                "notifications",
+                queryset=AppointmentNotification.objects.order_by("-created_at"),
+            )
+        )
+        .annotate(
+            reschedule_count=Count(
+                "history", filter=Q(history__event_type="rescheduled"), distinct=True
+            )
+        )
+        .all()
+    )
     pagination_class = OptInPageNumberPagination
     http_method_names = ["get", "post", "patch", "delete", "head", "options"]
 
@@ -106,7 +125,8 @@ class AppointmentViewSet(viewsets.ModelViewSet):
 
         source = params.get("source")
         if source:
-            queryset = queryset.filter(source=source)
+            # Comma-separated so "website bookings and phone" is one request.
+            queryset = queryset.filter(source__in=[s for s in source.split(",") if s])
 
         if params.get("needs_review") in ("1", "true", "True"):
             queryset = queryset.filter(match_status=Appointment.MatchStatus.AMBIGUOUS)
@@ -132,18 +152,50 @@ class AppointmentViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except SlotConflict as conflict:
+            return Response(
+                {
+                    "detail": "This time slot is already occupied.",
+                    "conflict": ConflictingAppointmentSerializer(conflict.conflicting).data,
+                    "can_override": can_override_slot(request.user),
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+        if serializer.validated_data.get("_conflict") is not None and not can_override_slot(
+            request.user
+        ):
+            return Response(
+                {
+                    "detail": (
+                        "You do not have permission to book over an existing appointment."
+                    ),
+                    "conflict": ConflictingAppointmentSerializer(
+                        serializer.validated_data["_conflict"]
+                    ).data,
+                    "can_override": False,
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
         appointment = serializer.save()
         if request.user and request.user.is_authenticated:
             appointment.created_by = request.user
             appointment.save(update_fields=["created_by"])
-        record_audit(
-            request,
-            action="create",
-            instance=appointment,
-            patient=appointment.patient,
-            changes={"source": appointment.source, "status": appointment.status},
+        record_event(
+            appointment,
+            event_type="created",
+            request=request,
+            new_status=appointment.status,
+            detail={"source": appointment.source},
         )
+        if appointment.slot_override:
+            record_event(
+                appointment,
+                event_type="slot_override",
+                request=request,
+                reason=appointment.slot_override_reason,
+            )
         return Response(
             AppointmentSerializer(appointment, context=self.get_serializer_context()).data,
             status=status.HTTP_201_CREATED,

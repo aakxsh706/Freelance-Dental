@@ -4,9 +4,10 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework import serializers
 
-from ..availability import slot_is_available
+from ..availability import slot_conflicts, slot_is_available
 from ..matching import resolve_patient_for_booking
 from ..models import Appointment, Patient
+from .appointment_actions import SlotConflict
 
 # Moving between these is either meaningless or destroys history, so the
 # transition table below is enforced rather than trusting the client to only
@@ -45,6 +46,13 @@ class AppointmentSerializer(serializers.ModelSerializer):
     needs_patient_review = serializers.BooleanField(read_only=True)
     has_visit = serializers.SerializerMethodField()
     visit_uuid = serializers.SerializerMethodField()
+    confirmed_by_name = serializers.SerializerMethodField()
+    checked_in_by_name = serializers.SerializerMethodField()
+    # Minutes late (negative = early). Lets the interface show the gap between
+    # the booked time and the actual arrival without recomputing it per row.
+    arrival_delay_minutes = serializers.IntegerField(read_only=True)
+    last_notification = serializers.SerializerMethodField()
+    was_rescheduled = serializers.SerializerMethodField()
 
     class Meta:
         model = Appointment
@@ -65,12 +73,20 @@ class AppointmentSerializer(serializers.ModelSerializer):
             "match_status",
             "match_candidates",
             "needs_patient_review",
+            "confirmed_at",
+            "confirmed_by_name",
             "checked_in_at",
+            "checked_in_by_name",
+            "arrival_delay_minutes",
             "completed_at",
             "cancelled_at",
             "cancellation_reason",
+            "slot_override",
+            "slot_override_reason",
             "has_visit",
             "visit_uuid",
+            "last_notification",
+            "was_rescheduled",
             "created_at",
             "updated_at",
         ]
@@ -82,6 +98,54 @@ class AppointmentSerializer(serializers.ModelSerializer):
     def get_visit_uuid(self, obj):
         visit = getattr(obj, "visit", None)
         return str(visit.uuid) if visit else None
+
+    def get_confirmed_by_name(self, obj) -> str:
+        return self._staff_name(obj.confirmed_by)
+
+    def get_checked_in_by_name(self, obj) -> str:
+        return self._staff_name(obj.checked_in_by)
+
+    @staticmethod
+    def _staff_name(user) -> str:
+        if user is None:
+            return ""
+        profile = getattr(user, "staff_profile", None)
+        if profile is not None and profile.full_name:
+            return profile.full_name
+        return user.get_full_name() or user.get_username()
+
+    def get_was_rescheduled(self, obj) -> bool:
+        """Has this appointment ever been moved?
+
+        Reads the annotation when the queryset provided one, so a list of
+        appointments does not issue a history query per row.
+        """
+        annotated = getattr(obj, "reschedule_count", None)
+        if annotated is not None:
+            return annotated > 0
+        return obj.history.filter(event_type="rescheduled").exists()
+
+    def get_last_notification(self, obj):
+        """Most recent email about this appointment, for the status line.
+
+        Read from a prefetched list where the caller provided one so a list of
+        appointments does not issue a query per row.
+        """
+        prefetched = getattr(obj, "_prefetched_objects_cache", {}).get("notifications")
+        latest = (
+            prefetched[0]
+            if prefetched
+            else obj.notifications.order_by("-created_at").first()
+        )
+        if latest is None:
+            return None
+        return {
+            "notification_type": latest.notification_type,
+            "status": latest.status,
+            "recipient_email": latest.recipient_email,
+            "failure_reason": latest.failure_reason,
+            "sent_at": latest.sent_at,
+        }
 
 
 class AppointmentStatusUpdateSerializer(serializers.ModelSerializer):
@@ -257,18 +321,23 @@ class StaffAppointmentWriteSerializer(serializers.ModelSerializer):
         )
         # A cancelled/no-show row holds no slot, so it needs no collision check.
         if rescheduling and status_value not in Appointment.SLOT_RELEASING_STATUSES:
-            clash = (
-                Appointment.objects.filter(
-                    appointment_date=appointment_date, appointment_time=appointment_time
-                )
-                .exclude(status__in=Appointment.SLOT_RELEASING_STATUSES)
-                .exclude(pk=getattr(instance, "pk", None))
-                .exists()
-            )
-            if clash:
-                raise serializers.ValidationError(
-                    {"appointment_time": "That slot is already taken by another appointment."}
-                )
+            clash = slot_conflicts(
+                appointment_date, appointment_time, exclude_pk=getattr(instance, "pk", None)
+            ).first()
+            if clash is not None:
+                if not self.initial_data.get("override"):
+                    # Surfaced by the view as a 409 naming who holds the slot,
+                    # so staff can choose another time or override deliberately.
+                    raise SlotConflict(clash)
+                if not (self.initial_data.get("override_reason") or "").strip():
+                    raise serializers.ValidationError(
+                        {
+                            "override_reason": (
+                                "A reason is required to book over an existing appointment."
+                            )
+                        }
+                    )
+                attrs["_conflict"] = clash
 
         patient = attrs.get("patient", getattr(instance, "patient", None))
         # Staff may book without selecting a patient (a phone enquiry from
@@ -304,8 +373,14 @@ class StaffAppointmentWriteSerializer(serializers.ModelSerializer):
         return validated_data
 
     def create(self, validated_data):
+        conflict = validated_data.pop("_conflict", None)
         validated_data = self._fill_snapshot(validated_data)
         validated_data.setdefault("source", Appointment.Source.CLINIC)
+        if conflict is not None:
+            validated_data["slot_override"] = True
+            validated_data["slot_override_reason"] = (
+                self.initial_data.get("override_reason") or ""
+            )[:255]
         if validated_data.get("patient") is not None:
             validated_data["match_status"] = Appointment.MatchStatus.LINKED
         try:
@@ -317,6 +392,7 @@ class StaffAppointmentWriteSerializer(serializers.ModelSerializer):
             ) from exc
 
     def update(self, instance, validated_data):
+        validated_data.pop("_conflict", None)
         validated_data = self._fill_snapshot(validated_data, instance)
         if validated_data.get("patient") is not None:
             validated_data["match_status"] = Appointment.MatchStatus.LINKED

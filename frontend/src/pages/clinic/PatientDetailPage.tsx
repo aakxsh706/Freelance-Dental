@@ -228,14 +228,31 @@ export function PatientDetailPage() {
               </thead>
               <tbody>
                 {data.recent_appointments.map((appointment) => (
-                  <tr key={appointment.id}>
+                  <tr key={appointment.id} className="hover:bg-(--color-surface)/60">
                     <Td className="whitespace-nowrap">
-                      {formatDateShort(appointment.appointment_date)}
+                      <Link
+                        to={`/clinic/appointments/${appointment.id}`}
+                        className="font-medium text-(--color-accent) hover:underline"
+                      >
+                        {formatDateShort(appointment.appointment_date)}
+                      </Link>
                     </Td>
                     <Td className="whitespace-nowrap">
                       {formatTimeOfDay(appointment.appointment_time)}
+                      {appointment.checked_in_at && (
+                        <div className="text-xs text-(--color-ink-faint)">
+                          arrived {formatTimeOfDay(appointment.checked_in_at.slice(11, 16))}
+                        </div>
+                      )}
                     </Td>
-                    <Td>{appointment.reason}</Td>
+                    <Td>
+                      {appointment.reason}
+                      {appointment.was_rescheduled && (
+                        <div className="mt-0.5">
+                          <Pill tone="warning">Rescheduled</Pill>
+                        </div>
+                      )}
+                    </Td>
                     <Td className="text-(--color-ink-soft)">{appointment.source_display}</Td>
                     <Td>
                       <StatusBadge status={appointment.status} />

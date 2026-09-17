@@ -368,7 +368,12 @@ class UpcomingSemanticsTests(APITestCase):
         self.assertEqual(row["next_appointment_date"], self.open_one.appointment_date.isoformat())
 
     def test_completed_appointment_still_holds_its_slot(self):
-        """The other half of the distinction: it is not bookable again."""
+        """The other half of the distinction: it is not bookable again.
+
+        Answered with 409 rather than 400 - the request was well formed, the
+        slot is simply taken - and the body names the appointment in the way,
+        so staff can pick another time or override deliberately.
+        """
         clash = self.client.post(
             "/api/appointments/",
             {
@@ -379,4 +384,6 @@ class UpcomingSemanticsTests(APITestCase):
             },
             format="json",
         )
-        self.assertEqual(clash.status_code, 400)
+        self.assertEqual(clash.status_code, 409)
+        self.assertEqual(clash.data["conflict"]["id"], self.completed.pk)
+        self.assertTrue(clash.data["can_override"])

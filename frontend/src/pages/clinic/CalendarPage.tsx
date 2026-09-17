@@ -174,18 +174,13 @@ export function CalendarPage() {
                           </span>
                           <StatusBadge status={appointment.status} />
                         </div>
-                        {appointment.patient ? (
-                          <Link
-                            to={`/clinic/patients/${appointment.patient.uuid}`}
-                            className="mt-0.5 block truncate text-sm text-(--color-ink) hover:text-(--color-accent) hover:underline"
-                          >
-                            {appointment.patient_name}
-                          </Link>
-                        ) : (
-                          <span className="mt-0.5 block truncate text-sm text-(--color-ink)">
-                            {appointment.patient_name}
-                          </span>
-                        )}
+                        <Link
+                          to={`/clinic/appointments/${appointment.id}`}
+                          className="mt-0.5 block truncate text-sm text-(--color-ink) hover:text-(--color-accent) hover:underline"
+                          title="Open appointment"
+                        >
+                          {appointment.patient_name}
+                        </Link>
                         <p className="truncate text-xs text-(--color-ink-soft)">
                           {appointment.reason}
                         </p>

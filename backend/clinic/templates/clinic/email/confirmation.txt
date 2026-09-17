@@ -1,0 +1,12 @@
+Hello {{ first_name }},
+
+Your appointment with {{ clinic.clinic_name }} has been confirmed.
+
+Date:
+{{ appointment_date }}
+
+Time:
+{{ appointment_time }}
+
+Please arrive a few minutes before your appointment.
+{% include "clinic/email/_signature.txt" %}

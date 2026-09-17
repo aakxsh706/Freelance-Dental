@@ -101,6 +101,39 @@ class CanManageSettings(permissions.BasePermission):
         return profile.can_manage_settings
 
 
+SLOT_OVERRIDE_PERMISSION = "clinic.override_appointment_slot"
+
+
+def can_override_slot(user) -> bool:
+    """May this person deliberately book over an existing appointment?
+
+    Two routes, because real clinics need both. A dentist or administrator has
+    it by virtue of their role. Anyone else - a senior receptionist who runs
+    the front desk, say - can be granted the explicit Django permission
+    individually in the admin, without being promoted to a clinical role they
+    should not have.
+    """
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser or user.has_perm(SLOT_OVERRIDE_PERMISSION):
+        return True
+    profile = staff_profile_for(user)
+    return profile is not None and profile.role in {
+        StaffProfile.Role.DENTIST,
+        StaffProfile.Role.ADMIN,
+    }
+
+
+class CanOverrideSlot(permissions.BasePermission):
+    message = (
+        "You do not have permission to book over an existing appointment. "
+        "Ask a dentist or administrator, or choose another time."
+    )
+
+    def has_permission(self, request, view):
+        return can_override_slot(request.user)
+
+
 class CanViewAudit(permissions.BasePermission):
     message = "Only a dentist or administrator can view the audit trail."
 

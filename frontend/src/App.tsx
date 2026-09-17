@@ -21,6 +21,11 @@ const AppointmentsPage = lazy(() =>
 const AppointmentFormPage = lazy(() =>
   import('./pages/clinic/AppointmentFormPage').then((m) => ({ default: m.AppointmentFormPage })),
 )
+const AppointmentDetailPage = lazy(() =>
+  import('./pages/clinic/AppointmentDetailPage').then((m) => ({
+    default: m.AppointmentDetailPage,
+  })),
+)
 const CalendarPage = lazy(() =>
   import('./pages/clinic/CalendarPage').then((m) => ({ default: m.CalendarPage })),
 )
@@ -93,6 +98,10 @@ function App() {
       <Route path="/clinic/dashboard" element={clinicPage(<ClinicDashboardPage />)} />
       <Route path="/clinic/appointments" element={clinicPage(<AppointmentsPage />)} />
       <Route path="/clinic/appointments/new" element={clinicPage(<AppointmentFormPage />)} />
+      <Route
+        path="/clinic/appointments/:appointmentId"
+        element={clinicPage(<AppointmentDetailPage />)}
+      />
       <Route path="/clinic/calendar" element={clinicPage(<CalendarPage />)} />
 
       <Route path="/clinic/patients" element={clinicPage(<PatientsPage />)} />

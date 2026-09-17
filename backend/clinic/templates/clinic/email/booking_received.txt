@@ -1,0 +1,13 @@
+Hello {{ first_name }},
+
+Thank you for booking with {{ clinic.clinic_name }}. We have received your
+request and the clinic will confirm it shortly.
+
+Requested Date:
+{{ appointment_date }}
+
+Requested Time:
+{{ appointment_time }}
+
+You will receive a separate email once your appointment is confirmed.
+{% include "clinic/email/_signature.txt" %}

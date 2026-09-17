@@ -4,6 +4,18 @@ Re-exported flat so existing imports (`from clinic.serializers import X`)
 continue to resolve after the split into modules.
 """
 
+from .appointment_actions import (
+    AppointmentHistorySerializer,
+    AppointmentNotificationSerializer,
+    CancelAppointmentSerializer,
+    CheckInSerializer,
+    ConfirmAppointmentSerializer,
+    ConflictingAppointmentSerializer,
+    EditAppointmentSerializer,
+    RescheduleAppointmentSerializer,
+    SlotConflict,
+    WalkInSerializer,
+)
 from .audit import AuditLogSerializer, StaffProfileSerializer
 from .clinic_config import (
     AvailableSlotSerializer,
@@ -46,6 +58,16 @@ from .scheduling import (
 __all__ = [
     "AllergySerializer",
     "AppointmentCreateSerializer",
+    "AppointmentHistorySerializer",
+    "AppointmentNotificationSerializer",
+    "CancelAppointmentSerializer",
+    "CheckInSerializer",
+    "ConfirmAppointmentSerializer",
+    "ConflictingAppointmentSerializer",
+    "EditAppointmentSerializer",
+    "RescheduleAppointmentSerializer",
+    "SlotConflict",
+    "WalkInSerializer",
     "AppointmentResolvePatientSerializer",
     "AppointmentSerializer",
     "AppointmentStatusUpdateSerializer",

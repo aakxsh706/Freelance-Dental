@@ -17,6 +17,13 @@ SLOT_RELEASING_STATUSES = ("cancelled", "no_show")
 # upcoming. Conflating the two puts finished visits in tomorrow's list.
 OPEN_STATUSES = ("pending", "confirmed", "checked_in")
 
+# Sources that do not reserve a place in the appointment book. A walk-in is an
+# unscheduled arrival: it is stamped with the clock time the person came
+# through the door, which is not a bookable slot and must not block one. Two
+# people can also walk in during the same minute. Excluded from both the
+# uniqueness constraint and the availability calculation, so the two agree.
+NON_RESERVING_SOURCES = ("walk_in",)
+
 
 class Appointment(models.Model):
     """A scheduled slot.
@@ -52,6 +59,7 @@ class Appointment(models.Model):
     # Re-exported on the model so call sites can use Appointment.SLOT_RELEASING_STATUSES.
     SLOT_RELEASING_STATUSES = SLOT_RELEASING_STATUSES
     OPEN_STATUSES = OPEN_STATUSES
+    NON_RESERVING_SOURCES = NON_RESERVING_SOURCES
 
     patient = models.ForeignKey(
         Patient,
@@ -84,10 +92,37 @@ class Appointment(models.Model):
         help_text="Patient ids a website booking could plausibly belong to, when more than one matched.",
     )
 
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    confirmed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="confirmed_appointments",
+    )
+
+    # Arrival is a different event from the scheduled time and never overwrites
+    # it. A patient booked at 10:30 who arrives at 11:15 keeps 10:30 as their
+    # appointment_time - the schedule is what was agreed, checked_in_at is what
+    # happened, and the gap between them is the clinic's running-late figure.
     checked_in_at = models.DateTimeField(null=True, blank=True)
+    checked_in_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="checked_in_appointments",
+    )
     completed_at = models.DateTimeField(null=True, blank=True)
     cancelled_at = models.DateTimeField(null=True, blank=True)
     cancellation_reason = models.CharField(max_length=255, blank=True)
+
+    # Set when staff deliberately booked over an existing appointment. The
+    # uniqueness constraint below exempts these rows: the constraint exists to
+    # stop accidental double-booking, and an override is the opposite of an
+    # accident - it is a decision, made by someone authorised, with a reason.
+    slot_override = models.BooleanField(default=False)
+    slot_override_reason = models.CharField(max_length=255, blank=True)
 
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -107,11 +142,26 @@ class Appointment(models.Model):
             models.Index(fields=["patient", "appointment_date"]),
         ]
         constraints = [
+            # The database is the last line of defence against two patients
+            # being given the same slot by two staff members at once. It covers
+            # only appointments that actually reserve a slot: not cancelled or
+            # no-show rows (the time is free again), not walk-ins (never
+            # reserved a slot), and not deliberate overrides.
             models.UniqueConstraint(
                 fields=["appointment_date", "appointment_time"],
-                condition=~models.Q(status__in=SLOT_RELEASING_STATUSES),
+                condition=(
+                    ~models.Q(status__in=SLOT_RELEASING_STATUSES)
+                    & ~models.Q(source__in=NON_RESERVING_SOURCES)
+                    & models.Q(slot_override=False)
+                ),
                 name="unique_active_appointment_slot",
             )
+        ]
+        permissions = [
+            (
+                "override_appointment_slot",
+                "Can book over an existing appointment (slot conflict override)",
+            ),
         ]
 
     def __str__(self) -> str:
@@ -120,3 +170,33 @@ class Appointment(models.Model):
     @property
     def needs_patient_review(self) -> bool:
         return self.match_status == self.MatchStatus.AMBIGUOUS
+
+    @property
+    def reserves_a_slot(self) -> bool:
+        """Whether this row occupies a bookable slot in the appointment book."""
+        return (
+            self.status not in SLOT_RELEASING_STATUSES
+            and self.source not in NON_RESERVING_SOURCES
+            and not self.slot_override
+        )
+
+    @property
+    def arrival_delay_minutes(self) -> int | None:
+        """Minutes between the booked time and the patient actually arriving.
+
+        Negative when they arrived early. None until they check in, and None
+        for walk-ins, whose scheduled time is their arrival time by definition
+        so the difference would be a meaningless zero.
+        """
+        if not self.checked_in_at or self.source in NON_RESERVING_SOURCES:
+            return None
+        from datetime import datetime
+
+        from django.utils import timezone
+
+        scheduled = datetime.combine(self.appointment_date, self.appointment_time)
+        if timezone.is_aware(self.checked_in_at):
+            scheduled = timezone.make_aware(
+                scheduled, timezone.get_current_timezone()
+            )
+        return round((self.checked_in_at - scheduled).total_seconds() / 60)

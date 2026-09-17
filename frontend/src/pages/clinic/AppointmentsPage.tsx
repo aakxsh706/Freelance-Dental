@@ -1,4 +1,4 @@
-import { Plus, Search, Stethoscope, UserCheck } from 'lucide-react'
+import { Plus, Search, Stethoscope, UserCheck, UserPlus } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
@@ -8,6 +8,7 @@ import {
 } from '../../api/appointments'
 import { ApiError } from '../../api/client'
 import { AppointmentStatusControl } from '../../components/clinic/AppointmentStatusControl'
+import { WalkInModal } from '../../components/clinic/WalkInModal'
 import {
   ActionButton,
   Card,
@@ -28,6 +29,15 @@ import { formatDateShort, formatTimeOfDay, sourceLabels } from '../../lib/format
 import type { Appointment } from '../../types'
 import type { AppointmentNeedingReview } from '../../types/clinic'
 
+const SOURCE_OPTIONS = [
+  { value: '', label: 'All sources' },
+  { value: 'website', label: 'Website bookings' },
+  { value: 'walk_in', label: 'Walk-ins' },
+  { value: 'clinic', label: 'Booked at clinic' },
+  { value: 'phone', label: 'Phone' },
+  { value: 'other', label: 'Other' },
+]
+
 const STATUS_OPTIONS = [
   { value: '', label: 'All statuses' },
   { value: 'pending', label: 'Pending' },
@@ -44,6 +54,8 @@ export function AppointmentsPage() {
 
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
+  const [source, setSource] = useState('')
+  const [walkInOpen, setWalkInOpen] = useState(false)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [page, setPage] = useState(1)
@@ -65,6 +77,7 @@ export function AppointmentsPage() {
       page,
       search: search.trim() || undefined,
       status: status || undefined,
+      source: source || undefined,
       date_from: dateFrom || undefined,
       date_to: dateTo || undefined,
       needs_review: needsReviewOnly || undefined,
@@ -78,7 +91,7 @@ export function AppointmentsPage() {
         setError(err instanceof ApiError ? err.message : 'Could not load appointments.'),
       )
       .finally(() => setLoading(false))
-  }, [page, search, status, dateFrom, dateTo, needsReviewOnly])
+  }, [page, search, status, source, dateFrom, dateTo, needsReviewOnly])
 
   useEffect(() => {
     // Debounced so typing in the search box does not fire a request per key.
@@ -109,12 +122,17 @@ export function AppointmentsPage() {
         title="Appointments"
         subtitle={`${count} appointment${count === 1 ? '' : 's'} matching your filters.`}
         actions={
-          <Link
-            to="/clinic/appointments/new"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-medium text-white hover:bg-(--color-accent-hover)"
-          >
-            <Plus className="h-4 w-4" /> New Appointment
-          </Link>
+          <>
+            <ActionButton onClick={() => setWalkInOpen(true)}>
+              <UserPlus className="h-4 w-4" /> Walk-In
+            </ActionButton>
+            <Link
+              to="/clinic/appointments/new"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-medium text-white hover:bg-(--color-accent-hover)"
+            >
+              <Plus className="h-4 w-4" /> New Appointment
+            </Link>
+          </>
         }
       />
 
@@ -135,7 +153,7 @@ export function AppointmentsPage() {
       )}
 
       <Card className="mb-5">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-(--color-ink-faint)" />
             <TextInput
@@ -156,6 +174,19 @@ export function AppointmentsPage() {
             }}
           >
             {STATUS_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
+          <Select
+            value={source}
+            onChange={(e) => {
+              setSource(e.target.value)
+              setPage(1)
+            }}
+          >
+            {SOURCE_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
@@ -221,11 +252,19 @@ export function AppointmentsPage() {
               {rows.map((appointment) => (
                 <tr key={appointment.id} className="hover:bg-(--color-surface)/60">
                   <Td>
-                    <div className="whitespace-nowrap font-medium">
+                    <Link
+                      to={`/clinic/appointments/${appointment.id}`}
+                      className="whitespace-nowrap font-medium text-(--color-accent) hover:underline"
+                    >
                       {formatDateShort(appointment.appointment_date)}
-                    </div>
+                    </Link>
                     <div className="text-xs text-(--color-ink-soft)">
                       {formatTimeOfDay(appointment.appointment_time)}
+                      {appointment.checked_in_at && (
+                        <span className="ml-1 text-(--color-ink-faint)">
+                          · in {formatTimeOfDay(appointment.checked_in_at.slice(11, 16))}
+                        </span>
+                      )}
                     </div>
                   </Td>
                   <Td>
@@ -305,6 +344,15 @@ export function AppointmentsPage() {
           </div>
         )}
       </Card>
+
+      <WalkInModal
+        open={walkInOpen}
+        onClose={() => setWalkInOpen(false)}
+        onDone={() => {
+          setWalkInOpen(false)
+          load()
+        }}
+      />
 
       <Modal
         open={resolving !== null}

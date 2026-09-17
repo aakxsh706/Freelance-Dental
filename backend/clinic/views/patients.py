@@ -151,8 +151,14 @@ class PatientViewSet(AuditedModelMixin, viewsets.ModelViewSet):
         patient = self.get_object()
         record_audit(request, action="view", instance=patient, patient=patient)
 
-        appointments = patient.appointments.select_related("patient").order_by(
-            "-appointment_date", "-appointment_time"
+        appointments = (
+            patient.appointments.select_related("patient")
+            .annotate(
+                reschedule_count=Count(
+                    "history", filter=Q(history__event_type="rescheduled"), distinct=True
+                )
+            )
+            .order_by("-appointment_date", "-appointment_time")
         )
         visits = patient.visits.annotate(
             treatment_count=Count("treatments")

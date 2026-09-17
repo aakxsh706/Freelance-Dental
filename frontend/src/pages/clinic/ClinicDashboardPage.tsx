@@ -1,10 +1,13 @@
-import { AlertCircle, ArrowRight, CalendarClock, Stethoscope } from 'lucide-react'
+import { AlertCircle, ArrowRight, CalendarClock, Plus, Stethoscope, UserPlus } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { listAppointmentsNeedingReview } from '../../api/appointments'
 import { getDashboardStats, getTodayQueue, getUpcomingAppointments } from '../../api/dentist'
 import { AppointmentStatusControl } from '../../components/clinic/AppointmentStatusControl'
+import { NotificationNotice } from '../../components/clinic/NotificationNotice'
+import { WalkInModal } from '../../components/clinic/WalkInModal'
 import {
+  ActionButton,
   Card,
   CardTitle,
   EmptyState,
@@ -16,8 +19,8 @@ import {
 } from '../../components/clinic/ui'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { useFetch } from '../../hooks/useFetch'
-import { formatDateShort, formatTimeOfDay } from '../../lib/format'
-import type { Appointment } from '../../types'
+import { formatDateShort, formatTimeOfDay, sourceLabels } from '../../lib/format'
+import type { Appointment, NotificationOutcome } from '../../types'
 
 function timeOfDayGreeting(): string {
   const hour = new Date().getHours()
@@ -35,6 +38,10 @@ export function ClinicDashboardPage() {
   // Status changes made from the queue update in place rather than refetching
   // the whole dashboard - the row the user just acted on should not jump.
   const [queueOverrides, setQueueOverrides] = useState<Record<number, Appointment>>({})
+  const [walkInOpen, setWalkInOpen] = useState(false)
+  // Surfaced under the queue so staff see whether the confirmation email
+  // actually reached the patient, not just that the status changed.
+  const [lastNotice, setLastNotice] = useState<NotificationOutcome | null>(null)
   const todayAppointments = (queue.data?.appointments ?? []).map(
     (appointment) => queueOverrides[appointment.id] ?? appointment,
   )
@@ -44,6 +51,19 @@ export function ClinicDashboardPage() {
       <PageHeader
         title={`${timeOfDayGreeting()}`}
         subtitle="Today's schedule, patient numbers and anything waiting on you."
+        actions={
+          <>
+            <ActionButton onClick={() => setWalkInOpen(true)}>
+              <UserPlus className="h-4 w-4" /> Walk-In
+            </ActionButton>
+            <Link
+              to="/clinic/appointments/new"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-(--color-accent) px-3 py-2 text-sm font-medium text-white hover:bg-(--color-accent-hover)"
+            >
+              <Plus className="h-4 w-4" /> New Appointment
+            </Link>
+          </>
+        }
       />
 
       {stats.error && <ErrorNote>{stats.error}</ErrorNote>}
@@ -142,19 +162,27 @@ export function ClinicDashboardPage() {
                 </span>
 
                 <div className="min-w-0 flex-1">
-                  {appointment.patient ? (
-                    <Link
-                      to={`/clinic/patients/${appointment.patient.uuid}`}
-                      className="truncate text-sm font-medium text-(--color-ink) hover:text-(--color-accent) hover:underline"
-                    >
-                      {appointment.patient_name}
-                    </Link>
-                  ) : (
-                    <span className="truncate text-sm font-medium text-(--color-ink)">
-                      {appointment.patient_name}
+                  <Link
+                    to={`/clinic/appointments/${appointment.id}`}
+                    className="truncate text-sm font-medium text-(--color-ink) hover:text-(--color-accent) hover:underline"
+                  >
+                    {appointment.patient_name}
+                  </Link>
+                  <p className="truncate text-sm text-(--color-ink-soft)">
+                    {appointment.reason}
+                    <span className="text-(--color-ink-faint)">
+                      {' · '}
+                      {sourceLabels[appointment.source] ?? appointment.source}
                     </span>
+                  </p>
+                  {appointment.checked_in_at && (
+                    <p className="text-xs text-(--color-ink-faint)">
+                      Arrived {formatTimeOfDay(appointment.checked_in_at.slice(11, 16))}
+                      {appointment.arrival_delay_minutes !== null &&
+                        appointment.arrival_delay_minutes > 5 &&
+                        ` · ${appointment.arrival_delay_minutes} min late`}
+                    </p>
                   )}
-                  <p className="truncate text-sm text-(--color-ink-soft)">{appointment.reason}</p>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -182,14 +210,25 @@ export function ClinicDashboardPage() {
                   <AppointmentStatusControl
                     appointment={appointment}
                     compact
-                    onChanged={(updated) =>
+                    onChanged={(updated) => {
                       setQueueOverrides((prev) => ({ ...prev, [updated.id]: updated }))
-                    }
+                      stats.reload()
+                    }}
+                    onNotification={setLastNotice}
                   />
                 </div>
               </li>
             ))}
           </ul>
+
+          {lastNotice && (
+            <div className="border-t border-(--color-border) px-5 py-3">
+              <NotificationNotice
+                outcome={lastNotice}
+                successLabel="Confirmation email sent to the patient"
+              />
+            </div>
+          )}
         </Card>
 
         <Card padded={false}>
@@ -222,6 +261,16 @@ export function ClinicDashboardPage() {
           </ul>
         </Card>
       </div>
+
+      <WalkInModal
+        open={walkInOpen}
+        onClose={() => setWalkInOpen(false)}
+        onDone={() => {
+          setWalkInOpen(false)
+          queue.reload()
+          stats.reload()
+        }}
+      />
     </>
   )
 }

@@ -1,27 +1,45 @@
 import { useState } from 'react'
-import { updateAppointmentStatus } from '../../api/appointments'
+import { useNavigate } from 'react-router-dom'
+import {
+  checkInAppointment,
+  confirmAppointment,
+  updateAppointmentStatus,
+} from '../../api/appointments'
 import { ApiError } from '../../api/client'
-import type { Appointment, AppointmentStatus } from '../../types'
+import type { Appointment, AppointmentStatus, NotificationOutcome } from '../../types'
 import { ActionButton } from './ui'
 
-/** Which moves are offered from each status.
+/**
+ * The one-click actions for an appointment row.
  *
- * Mirrors the server's transition table so the interface never presents a
- * button that would be rejected. Terminal states offer nothing - a completed
- * appointment is history, not a draft. */
-const NEXT_ACTIONS: Record<AppointmentStatus, { to: AppointmentStatus; label: string; tone?: 'primary' | 'secondary' | 'danger' }[]> = {
-  pending: [
-    { to: 'confirmed', label: 'Confirm', tone: 'primary' },
-    { to: 'cancelled', label: 'Cancel', tone: 'danger' },
-  ],
+ * Every action here goes through the endpoint that owns it rather than a
+ * generic status PATCH. That matters: confirming through the confirm endpoint
+ * emails the patient and stamps who accepted it, while a bare status change
+ * would silently do neither - an appointment marked confirmed that the patient
+ * was never told about is worse than one still showing as pending.
+ *
+ * Cancelling is deliberately absent. It needs a reason and a decision about
+ * whether to email, so it lives on the appointment page where there is room to
+ * ask, not as a one-click button in a dense row.
+ */
+
+type ActionKey = 'accept' | 'check_in' | 'complete' | 'no_show'
+
+interface ActionSpec {
+  key: ActionKey
+  label: string
+  tone?: 'primary' | 'secondary' | 'danger'
+}
+
+const ACTIONS_BY_STATUS: Record<AppointmentStatus, ActionSpec[]> = {
+  pending: [{ key: 'accept', label: 'Accept', tone: 'primary' }],
   confirmed: [
-    { to: 'checked_in', label: 'Check In', tone: 'primary' },
-    { to: 'no_show', label: 'No Show' },
-    { to: 'cancelled', label: 'Cancel', tone: 'danger' },
+    { key: 'check_in', label: 'Check In', tone: 'primary' },
+    { key: 'no_show', label: 'No Show' },
   ],
   checked_in: [
-    { to: 'completed', label: 'Complete', tone: 'primary' },
-    { to: 'no_show', label: 'No Show' },
+    { key: 'complete', label: 'Complete', tone: 'primary' },
+    { key: 'no_show', label: 'No Show' },
   ],
   completed: [],
   cancelled: [],
@@ -31,24 +49,43 @@ const NEXT_ACTIONS: Record<AppointmentStatus, { to: AppointmentStatus; label: st
 export function AppointmentStatusControl({
   appointment,
   onChanged,
+  onNotification,
   compact = false,
 }: {
   appointment: Appointment
   onChanged: (updated: Appointment) => void
+  /** Lets the parent surface whether the patient's email actually went out. */
+  onNotification?: (outcome: NotificationOutcome) => void
   compact?: boolean
 }) {
-  const [busy, setBusy] = useState<AppointmentStatus | null>(null)
+  const navigate = useNavigate()
+  const [busy, setBusy] = useState<ActionKey | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const actions = NEXT_ACTIONS[appointment.status] ?? []
+  const actions = ACTIONS_BY_STATUS[appointment.status] ?? []
   if (actions.length === 0) return null
 
-  async function move(to: AppointmentStatus) {
-    setBusy(to)
+  async function run(key: ActionKey) {
+    setBusy(key)
     setError(null)
     try {
-      const updated = await updateAppointmentStatus(appointment.id, to)
-      onChanged(updated)
+      if (key === 'accept') {
+        const result = await confirmAppointment(appointment.id)
+        onChanged(result.appointment)
+        onNotification?.(result.notification)
+      } else if (key === 'check_in') {
+        // Arrival defaults to now. Correcting it is done on the appointment
+        // page, which can show the scheduled time beside it for context.
+        const result = await checkInAppointment(appointment.id)
+        onChanged(result.appointment)
+      } else {
+        onChanged(
+          await updateAppointmentStatus(
+            appointment.id,
+            key === 'complete' ? 'completed' : 'no_show',
+          ),
+        )
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not update this appointment.')
     } finally {
@@ -61,17 +98,25 @@ export function AppointmentStatusControl({
       <div className="flex flex-wrap items-center gap-1.5">
         {actions.map((action) => (
           <ActionButton
-            key={action.to}
+            key={action.key}
             tone={action.tone ?? 'secondary'}
             disabled={busy !== null}
-            onClick={() => move(action.to)}
+            onClick={() => run(action.key)}
             className={compact ? 'px-2.5 py-1.5 text-xs' : ''}
           >
-            {busy === action.to ? '…' : action.label}
+            {busy === action.key ? '…' : action.label}
           </ActionButton>
         ))}
+        <ActionButton
+          tone="ghost"
+          onClick={() => navigate(`/clinic/appointments/${appointment.id}`)}
+          className={compact ? 'px-2 py-1.5 text-xs' : ''}
+          title="Open appointment for reschedule, cancel and history"
+        >
+          Manage
+        </ActionButton>
       </div>
-      {error && <span className="text-xs text-(--color-danger)">{error}</span>}
+      {error && <span className="max-w-xs text-right text-xs text-(--color-danger)">{error}</span>}
     </div>
   )
 }
