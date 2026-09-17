@@ -158,7 +158,7 @@ class PatientViewSet(AuditedModelMixin, viewsets.ModelViewSet):
                     "history", filter=Q(history__event_type="rescheduled"), distinct=True
                 )
             )
-            .order_by("-appointment_date", "-appointment_time")
+            .order_by("-appointment_date", "-appointment_time", "-id")
         )
         visits = patient.visits.annotate(
             treatment_count=Count("treatments")

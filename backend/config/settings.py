@@ -81,6 +81,18 @@ TEMPLATES = [
             ],
         },
     },
+    {
+        # Plain-text emails. Autoescaping is a defence against HTML injection
+        # and has no meaning in a .txt body - left on, a clinic named
+        # "Belin's Dental Clinic" reaches the patient as "Belin&#x27;s".
+        # Rendered explicitly with using="text"; the HTML parts keep the
+        # escaping engine above.
+        "NAME": "text",
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {"autoescape": False},
+    },
 ]
 
 WSGI_APPLICATION = "config.wsgi.application"

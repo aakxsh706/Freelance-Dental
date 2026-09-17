@@ -1,7 +1,6 @@
 Hello {{ first_name }},
 
-Thank you for booking with {{ clinic.clinic_name }}. We have received your
-request and the clinic will confirm it shortly.
+We have received your appointment request.
 
 Requested Date:
 {{ appointment_date }}
@@ -9,5 +8,8 @@ Requested Date:
 Requested Time:
 {{ appointment_time }}
 
-You will receive a separate email once your appointment is confirmed.
+Your request is currently awaiting confirmation from the clinic. This email is
+a receipt, not a confirmation - your appointment is not booked yet.
+
+You will receive another email once the clinic has confirmed it.
 {% include "clinic/email/_signature.txt" %}

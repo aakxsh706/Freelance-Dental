@@ -1,0 +1,9 @@
+{% extends "clinic/email/_base.html" %}{% block content %}
+<p style="margin:0 0 12px;">Hello {{ first_name }},</p>
+<p style="margin:0 0 4px;">Thank you for your appointment request with {{ clinic.clinic_name }}.
+Unfortunately we are unable to confirm the time you asked for.</p>
+{% include "clinic/email/_detail_box.html" with box_label="Requested" box_date=appointment_date box_time=appointment_time %}
+{% if reason %}<p style="margin:0 0 12px;color:#5b6467;">{{ reason }}</p>{% endif %}
+<p style="margin:0;">Please contact the clinic and we will be glad to arrange another suitable
+time for you.</p>
+{% endblock %}

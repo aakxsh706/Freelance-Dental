@@ -92,6 +92,16 @@ class Appointment(models.Model):
         help_text="Patient ids a website booking could plausibly belong to, when more than one matched.",
     )
 
+    # What the patient originally asked for, frozen at booking time.
+    #
+    # Separate from appointment_date/time, which are the *current* schedule and
+    # move when staff reschedule. The clinic routinely approves a request at a
+    # different time than the one asked for, and the confirmation email has to
+    # say "you asked for 10:30, you are confirmed for 11:30" - which is
+    # impossible once the original has been overwritten.
+    requested_date = models.DateField(null=True, blank=True)
+    requested_time = models.TimeField(null=True, blank=True)
+
     confirmed_at = models.DateTimeField(null=True, blank=True)
     confirmed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -170,6 +180,32 @@ class Appointment(models.Model):
     @property
     def needs_patient_review(self) -> bool:
         return self.match_status == self.MatchStatus.AMBIGUOUS
+
+    @property
+    def was_moved_before_confirming(self) -> bool:
+        """True when the approved time differs from the one requested.
+
+        Drives the extra line in the confirmation email, so a patient who asked
+        for 10:30 and was given 11:30 is told plainly rather than being left to
+        spot the difference.
+        """
+        if self.requested_date is None or self.requested_time is None:
+            return False
+        return (
+            self.requested_date != self.appointment_date
+            or self.requested_time != self.appointment_time
+        )
+
+    def save(self, *args, **kwargs):
+        """Freeze the requested schedule on first save only.
+
+        Never refreshed afterwards: a reschedule changes what the appointment
+        *is*, not what was originally asked for.
+        """
+        if self._state.adding and self.requested_date is None:
+            self.requested_date = self.appointment_date
+            self.requested_time = self.appointment_time
+        super().save(*args, **kwargs)
 
     @property
     def reserves_a_slot(self) -> bool:

@@ -41,6 +41,12 @@ export interface Appointment {
   match_status: MatchStatus
   match_candidates: number[]
   needs_patient_review: boolean
+  /** What the patient originally asked for. Frozen at booking; unlike
+   * appointment_date/time it does not move when staff reschedule. */
+  requested_date: string | null
+  requested_time: string | null
+  /** True when the approved time differs from the requested one. */
+  was_moved_before_confirming: boolean
   confirmed_at: string | null
   confirmed_by_name: string
   /** When the patient actually arrived. A different fact from

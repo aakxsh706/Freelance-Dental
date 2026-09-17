@@ -102,8 +102,18 @@ class AcceptanceTests(WorkflowTestCase):
         self.assertIsNotNone(appointment.confirmed_at)
         self.assertEqual(appointment.confirmed_by, self.receptionist)
 
+    def test_booking_sends_an_acknowledgement_that_is_not_a_confirmation(self):
+        """The receipt must not read as though the appointment is booked."""
+        self.book_public()
+        self.assertEqual(len(mail.outbox), 1)
+        acknowledgement = mail.outbox[0]
+        self.assertIn("Request Received", acknowledgement.subject)
+        self.assertNotIn("Confirmed", acknowledgement.subject)
+        self.assertIn("not a confirmation", acknowledgement.body)
+
     def test_confirmation_emails_the_patient(self):
         appointment_id = self.book_public().data["id"]
+        mail.outbox.clear()  # drop the booking acknowledgement
         self.client.force_authenticate(self.receptionist)
         response = self.client.post(f"/api/appointments/{appointment_id}/confirm/", {}, format="json")
 
@@ -116,6 +126,56 @@ class AcceptanceTests(WorkflowTestCase):
                 appointment_id=appointment_id, notification_type="confirmation", status="sent"
             ).exists()
         )
+
+    def test_confirmation_email_is_sent_as_text_and_html(self):
+        appointment_id = self.book_public().data["id"]
+        mail.outbox.clear()
+        self.client.force_authenticate(self.receptionist)
+        self.client.post(f"/api/appointments/{appointment_id}/confirm/", {}, format="json")
+
+        message = mail.outbox[0]
+        self.assertTrue(message.body.strip())
+        types = [content_type for _, content_type in message.alternatives]
+        self.assertIn("text/html", types)
+
+    def test_confirmation_states_the_final_time_after_a_reschedule(self):
+        """§20: approving a request that was moved must confirm the NEW time."""
+        appointment_id = self.book_public(at=time(10, 30)).data["id"]
+        self.client.force_authenticate(self.receptionist)
+        self.client.post(
+            f"/api/appointments/{appointment_id}/reschedule/",
+            {
+                "appointment_date": self.workday.isoformat(),
+                "appointment_time": "11:30",
+                "reason": "10:30 not available",
+            },
+            format="json",
+        )
+        mail.outbox.clear()
+        self.client.post(f"/api/appointments/{appointment_id}/confirm/", {}, format="json")
+
+        body = mail.outbox[0].body
+        self.assertIn("11:30 AM", body)
+        # And it says plainly that this differs from what was asked for.
+        self.assertIn("originally requested", body)
+        self.assertIn("10:30 AM", body)
+
+    def test_the_originally_requested_time_is_preserved(self):
+        appointment_id = self.book_public(at=time(10, 30)).data["id"]
+        self.client.force_authenticate(self.receptionist)
+        self.client.post(
+            f"/api/appointments/{appointment_id}/reschedule/",
+            {
+                "appointment_date": self.workday.isoformat(),
+                "appointment_time": "11:30",
+                "reason": "moved",
+            },
+            format="json",
+        )
+        appointment = Appointment.objects.get(pk=appointment_id)
+        self.assertEqual(appointment.requested_time, time(10, 30))
+        self.assertEqual(appointment.appointment_time, time(11, 30))
+        self.assertTrue(appointment.was_moved_before_confirming)
 
     def test_confirmation_email_carries_no_clinical_information(self):
         """Appointment mail is administrative only - §4."""
@@ -156,10 +216,11 @@ class AcceptanceTests(WorkflowTestCase):
         second = self.client.post(f"/api/appointments/{appointment_id}/confirm/", {}, format="json")
 
         self.assertEqual(second.status_code, 400)
-        self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(
             AppointmentNotification.objects.filter(notification_type="confirmation").count(), 1
         )
+        confirmations = [m for m in mail.outbox if "Confirmed" in m.subject]
+        self.assertEqual(len(confirmations), 1)
 
     def test_a_blank_booking_email_falls_back_to_the_patient_record(self):
         """Someone who left the field empty is still reachable if we hold an
@@ -554,15 +615,30 @@ class CancellationTests(WorkflowTestCase):
             AppointmentNotification.objects.filter(notification_type="cancellation").exists()
         )
 
-    def test_declining_a_pending_request_does_not_email(self):
-        """Nobody was expecting this appointment, so there is nothing to cancel on them."""
+    def test_declining_a_pending_request_uses_softer_wording(self):
+        """A request that was never accepted is not an appointment being
+        cancelled on someone - §18. The patient did nothing wrong and the
+        email must not read as a rebuke."""
         self.appointment.status = Appointment.Status.PENDING
         self.appointment.save()
+        mail.outbox.clear()
         self.client.post(
-            f"/api/appointments/{self.appointment.pk}/cancel/", {"reason": "Slot withdrawn"},
+            f"/api/appointments/{self.appointment.pk}/cancel/",
+            {"reason": "Requested slot unavailable"},
             format="json",
         )
-        self.assertEqual(len(mail.outbox), 0)
+
+        self.assertEqual(len(mail.outbox), 1)
+        message = mail.outbox[0]
+        self.assertIn("Update About Your Appointment Request", message.subject)
+        for harsh in ["rejected", "cancelled", "Cancelled"]:
+            self.assertNotIn(harsh, message.body)
+        self.assertIn("unable to confirm", message.body)
+        self.assertTrue(
+            AppointmentNotification.objects.filter(
+                notification_type="request_declined"
+            ).exists()
+        )
 
     def test_cancellation_is_recorded_in_history(self):
         self.client.post(
@@ -658,10 +734,122 @@ class HistoryEndpointTests(WorkflowTestCase):
         events = [h["event_type"] for h in response.data["history"]]
         self.assertIn("confirmed", events)
         self.assertIn("created", events)
-        self.assertEqual(len(response.data["notifications"]), 1)
+        types = {n["notification_type"] for n in response.data["notifications"]}
+        self.assertIn("confirmation", types)
+        self.assertIn("booking_received", types)
 
     def test_history_requires_staff(self):
         appointment_id = self.book_public().data["id"]
         self.client.force_authenticate(user=None)
         response = self.client.get(f"/api/appointments/{appointment_id}/history/")
         self.assertIn(response.status_code, (401, 403))
+
+
+class EmailRenderingTests(WorkflowTestCase):
+    """The message the patient actually receives."""
+
+    def test_plain_text_email_is_not_html_escaped(self):
+        """A clinic named "Belin's" must not arrive as "Belin&#x27;s".
+
+        Django autoescapes by default, which is correct for the HTML part and
+        wrong for the text part; the text engine is configured separately.
+        """
+        from ..models import ClinicSettings
+        from ..notifications import build_message
+
+        settings_obj = ClinicSettings.load()
+        settings_obj.clinic_name = "Belin's Dental Clinic"
+        settings_obj.save()
+
+        appointment = Appointment.objects.create(
+            patient_name="John Mathew", phone="x", email="john@example.com",
+            reason="Checkup", appointment_date=self.workday, appointment_time=time(9, 0),
+        )
+        subject, body = build_message(appointment, "confirmation")
+        self.assertIn("Belin's Dental Clinic", body)
+        self.assertNotIn("&#x27;", body)
+        self.assertNotIn("&amp;", body)
+        self.assertIn("Belin's Dental Clinic", subject)
+
+    def test_every_notification_type_renders(self):
+        """Guards against a template that only breaks for one message type."""
+        from ..models import AppointmentNotification
+        from ..notifications import build_message
+
+        appointment = Appointment.objects.create(
+            patient_name="John Mathew", phone="x", email="john@example.com",
+            reason="Checkup", appointment_date=self.workday, appointment_time=time(9, 0),
+        )
+        extra = {"previous_date": "20 September 2026", "previous_time": "10:30 AM"}
+        for kind, _ in AppointmentNotification.Type.choices:
+            if kind == "reminder":
+                continue  # no template yet; not sent by any code path
+            subject, body = build_message(appointment, kind, extra)
+            self.assertTrue(subject.strip(), kind)
+            self.assertIn("John", body, kind)
+
+
+class ResendTests(WorkflowTestCase):
+    def setUp(self):
+        super().setUp()
+        self.client.force_authenticate(self.receptionist)
+        self.appointment_id = self.book_public().data["id"]
+        self.client.force_authenticate(self.receptionist)
+
+    def test_resend_retries_a_failed_confirmation_without_changing_status(self):
+        with mock.patch(
+            "django.core.mail.EmailMessage.send", side_effect=OSError("SMTP down")
+        ):
+            self.client.post(
+                f"/api/appointments/{self.appointment_id}/confirm/", {}, format="json"
+            )
+        appointment = Appointment.objects.get(pk=self.appointment_id)
+        self.assertEqual(appointment.status, "confirmed")
+
+        mail.outbox.clear()
+        response = self.client.post(
+            f"/api/appointments/{self.appointment_id}/resend-notification/", {}, format="json"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["notification"]["status"], "sent")
+        # The retry must not have touched the appointment itself.
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.status, "confirmed")
+
+    def test_resend_requires_authentication(self):
+        self.client.force_authenticate(user=None)
+        response = self.client.post(
+            f"/api/appointments/{self.appointment_id}/resend-notification/", {}, format="json"
+        )
+        self.assertIn(response.status_code, (401, 403))
+
+
+class PublicBookingSecurityTests(WorkflowTestCase):
+    def test_public_cannot_force_a_confirmed_status(self):
+        """§3: the initial status is the backend's decision, not the payload's."""
+        self.client.force_authenticate(user=None)
+        response = self.client.post(
+            "/api/appointments/",
+            {
+                "patient_name": "Sneaky", "phone": "+91 91111 00000", "email": "",
+                "reason": "x", "appointment_date": self.workday.isoformat(),
+                "appointment_time": "09:00", "status": "confirmed",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["status"], "pending")
+        self.assertEqual(Appointment.objects.get(pk=response.data["id"]).status, "pending")
+
+    def test_public_cannot_read_other_appointments(self):
+        self.book_public()
+        self.client.force_authenticate(user=None)
+        self.assertIn(self.client.get("/api/appointments/").status_code, (401, 403))
+
+    def test_public_cannot_reach_the_notification_history(self):
+        appointment_id = self.book_public().data["id"]
+        self.client.force_authenticate(user=None)
+        self.assertIn(
+            self.client.get(f"/api/appointments/{appointment_id}/history/").status_code,
+            (401, 403),
+        )

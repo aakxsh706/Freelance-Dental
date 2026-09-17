@@ -18,7 +18,7 @@ appointment moved.
 import logging
 
 from django.conf import settings
-from django.core.mail import EmailMessage
+from django.core.mail import EmailMultiAlternatives
 from django.db import IntegrityError, transaction
 from django.template.loader import render_to_string
 from django.utils import timezone
@@ -27,22 +27,33 @@ from .models import AppointmentNotification, ClinicSettings
 
 logger = logging.getLogger(__name__)
 
+# Each entry is (template stem, subject stem). The stem resolves to both a
+# .txt and a .html template; the plain-text part is the one that must always
+# work, since some clients and most screen readers read it in preference.
 TEMPLATES = {
     AppointmentNotification.Type.BOOKING_RECEIVED: (
-        "clinic/email/booking_received.txt",
-        "We have received your appointment request",
+        "booking_received",
+        # Wording matters here: this is a receipt for a request, and must not
+        # read as though the appointment is booked.
+        "Appointment Request Received",
     ),
     AppointmentNotification.Type.CONFIRMATION: (
-        "clinic/email/confirmation.txt",
+        "confirmation",
         "Your Appointment Is Confirmed",
     ),
     AppointmentNotification.Type.RESCHEDULE: (
-        "clinic/email/reschedule.txt",
+        "reschedule",
         "Your Appointment Has Been Rescheduled",
     ),
     AppointmentNotification.Type.CANCELLATION: (
-        "clinic/email/cancellation.txt",
+        "cancellation",
         "Your Appointment Has Been Cancelled",
+    ),
+    AppointmentNotification.Type.REQUEST_DECLINED: (
+        "request_declined",
+        # Never "rejected" - the patient did nothing wrong, the slot was simply
+        # not available.
+        "Update About Your Appointment Request",
     ),
 }
 
@@ -79,19 +90,39 @@ def recipient_for(appointment) -> str:
     return ""
 
 
-def build_message(appointment, notification_type: str, context_extra: dict | None = None):
-    """Render subject and body. Returns (subject, body)."""
-    template, subject_stem = TEMPLATES[notification_type]
-    clinic = ClinicSettings.load()
+def build_context(appointment, context_extra: dict | None = None) -> dict:
+    """Everything an appointment email may reference.
+
+    Date and time are read from the appointment as it stands *now*, never from
+    values captured earlier: staff routinely move a request before approving
+    it, and an email confirming the time the patient originally asked for
+    rather than the one they were actually given is the worst possible bug in
+    this feature.
+
+    Clinic details come from ClinicSettings, so changing the phone number in
+    one place changes it in every email.
+    """
     context = {
-        "clinic": clinic,
+        "clinic": ClinicSettings.load(),
         "first_name": _first_name(appointment),
         "patient_name": appointment.patient_name,
         "appointment_date": _format_date(appointment.appointment_date),
         "appointment_time": _format_time(appointment.appointment_time),
+        "requested_date": _format_date(appointment.requested_date),
+        "requested_time": _format_time(appointment.requested_time),
+        "moved_before_confirming": appointment.was_moved_before_confirming,
     }
     context.update(context_extra or {})
-    body = render_to_string(template, context)
+    return context
+
+
+def build_message(appointment, notification_type: str, context_extra: dict | None = None):
+    """Render subject and plain-text body. Returns (subject, body)."""
+    stem, subject_stem = TEMPLATES[notification_type]
+    clinic = ClinicSettings.load()
+    context = build_context(appointment, context_extra)
+    # using="text" selects the non-autoescaping engine - see settings.TEMPLATES.
+    body = render_to_string(f"clinic/email/{stem}.txt", context, using="text")
     # Templates use {% if %} blocks for optional clinic details, which leaves
     # ragged blank lines; collapse runs of them so the email reads cleanly.
     lines = [line.rstrip() for line in body.splitlines()]
@@ -163,12 +194,25 @@ def deliver(notification, context_extra: dict | None = None) -> bool:
         subject, body = build_message(
             appointment, notification.notification_type, context_extra
         )
-        message = EmailMessage(
+        message = EmailMultiAlternatives(
             subject=subject,
             body=body,
             from_email=settings.DEFAULT_FROM_EMAIL,
             to=[notification.recipient_email],
         )
+        # HTML is an alternative, never the only version. If it fails to render
+        # the patient still gets a readable email rather than nothing.
+        stem, _ = TEMPLATES[notification.notification_type]
+        try:
+            message.attach_alternative(
+                render_to_string(
+                    f"clinic/email/{stem}.html",
+                    build_context(appointment, context_extra),
+                ),
+                "text/html",
+            )
+        except Exception:
+            logger.exception("HTML part failed to render for %s; sending text only", stem)
         message.send(fail_silently=False)
     except Exception as exc:
         notification.status = AppointmentNotification.Status.FAILED

@@ -292,6 +292,17 @@ export function AppointmentsPage() {
                     <div className="flex flex-col items-start gap-1">
                       <StatusBadge status={appointment.status} />
                       {appointment.needs_patient_review && <Pill tone="warning">Needs review</Pill>}
+                      {/* Delivery state only when it needs attention or
+                          reassurance - a quiet line, not another badge. */}
+                      {appointment.last_notification?.status === 'failed' && (
+                        <span className="text-xs font-medium text-(--color-danger)">
+                          Email failed
+                        </span>
+                      )}
+                      {appointment.last_notification?.status === 'sent' &&
+                        appointment.status === 'confirmed' && (
+                          <span className="text-xs text-(--color-ink-faint)">Email sent</span>
+                        )}
                     </div>
                   </Td>
                   <Td>

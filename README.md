@@ -43,7 +43,7 @@ Sign in at `/clinic/login` with the credentials `seed_clinic` reports
 (`DENTIST_USERNAME` / `DENTIST_PASSWORD` in `backend/.env`).
 
 ```bash
-cd backend  && ./venv/bin/python manage.py test clinic   # 110 tests
+cd backend  && ./venv/bin/python manage.py test clinic   # 121 tests
 cd frontend && npx tsc -b && npx oxlint && npm run build
 ```
 
@@ -97,6 +97,31 @@ contact details on a historical appointment.
 dashboard expects a bare JSON array from `/api/appointments/`. Pagination is
 opt-in per request (`?page=1`) via `OptInPageNumberPagination`; switching it on
 globally would break that caller.
+
+**A request is not a booking.** A public booking creates a `pending`
+*request*; the status is set by the backend and a `status` in the payload is
+ignored. The public confirmation screen says "Appointment Request Submitted",
+labels the date and time as *requested*, and states plainly that the patient is
+not booked until the clinic confirms. The acknowledgement email says the same -
+it is a receipt, not a confirmation.
+
+**The originally requested time is kept.** `requested_date`/`requested_time` are
+frozen at booking and never move, while `appointment_date`/`appointment_time`
+are the current schedule. The clinic routinely approves a request at a
+different time than the one asked for, so the confirmation email reads the
+appointment *as it stands at send time* and, when they differ, says "you
+originally requested 10:30, you are confirmed for 11:30".
+
+**Declining a request is not cancelling an appointment.** Someone who was never
+given an appointment is told the clinic could not fit them, not that their
+appointment was cancelled - the second implies they had one and reads as a
+rebuke for something they did not do. Separate template, separate notification
+type.
+
+**Plain-text emails render through a second template engine** with autoescaping
+off (`using="text"`). Left on, a clinic called "Belin's Dental Clinic" reaches
+the patient as `Belin&#x27;s`. The HTML alternative keeps the escaping engine,
+and is always an alternative - never the only version.
 
 **The appointment is authoritative; the email is a side effect.** Confirming,
 rescheduling or cancelling writes to the database inside a transaction, commits,

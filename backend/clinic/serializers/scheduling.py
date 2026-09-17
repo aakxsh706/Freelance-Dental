@@ -53,6 +53,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
     arrival_delay_minutes = serializers.IntegerField(read_only=True)
     last_notification = serializers.SerializerMethodField()
     was_rescheduled = serializers.SerializerMethodField()
+    was_moved_before_confirming = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Appointment
@@ -73,6 +74,9 @@ class AppointmentSerializer(serializers.ModelSerializer):
             "match_status",
             "match_candidates",
             "needs_patient_review",
+            "requested_date",
+            "requested_time",
+            "was_moved_before_confirming",
             "confirmed_at",
             "confirmed_by_name",
             "checked_in_at",

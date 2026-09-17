@@ -383,17 +383,22 @@ class AppointmentActionsMixin:
             )
 
         notification = None
-        # Only tell the patient if they were expecting to come in. Declining a
-        # request the clinic never accepted is not the same as cancelling on
-        # someone, and an email about it would confuse more than it informs.
-        if data.get("notify", True) and previous_status in (
-            Appointment.Status.CONFIRMED,
-            Appointment.Status.CHECKED_IN,
-        ):
+        if data.get("notify", True):
+            # Two different messages for two different situations. Someone who
+            # was expecting to come in is being cancelled on. Someone whose
+            # request was never accepted is being told we could not fit them -
+            # telling them their "appointment was cancelled" would imply they
+            # had one, and reads as a rebuke for something they did not do.
+            declining_request = previous_status == Appointment.Status.PENDING
             notification = notify(
                 appointment,
-                AppointmentNotification.Type.CANCELLATION,
-                dedupe_key="cancellation",
+                (
+                    AppointmentNotification.Type.REQUEST_DECLINED
+                    if declining_request
+                    else AppointmentNotification.Type.CANCELLATION
+                ),
+                dedupe_key="request_declined" if declining_request else "cancellation",
+                context_extra={"reason": data.get("reason", "")},
             )
         return self._respond(appointment, notification)
 

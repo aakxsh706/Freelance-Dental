@@ -29,7 +29,12 @@ from ..serializers import (
     StaffAppointmentWriteSerializer,
 )
 from ..permissions import can_override_slot
-from .appointment_actions import AppointmentActionsMixin, WalkInMixin
+from ..notifications import notify
+from .appointment_actions import (
+    AppointmentActionsMixin,
+    WalkInMixin,
+    notification_payload,
+)
 from .mixins import OptInPageNumberPagination
 
 AUDIT_FIELDS = (
@@ -64,7 +69,11 @@ class AppointmentViewSet(AppointmentActionsMixin, WalkInMixin, viewsets.ModelVie
                 "history", filter=Q(history__event_type="rescheduled"), distinct=True
             )
         )
-        .all()
+        # annotate() introduces a GROUP BY, which discards Meta.ordering. Without
+        # restoring it the list is unordered, and an unordered queryset paginates
+        # inconsistently - the same row can appear on two pages while another is
+        # never shown. `id` is the tiebreaker so the order is total.
+        .order_by("appointment_date", "appointment_time", "id")
     )
     pagination_class = OptInPageNumberPagination
     http_method_names = ["get", "post", "patch", "delete", "head", "options"]
@@ -147,10 +156,11 @@ class AppointmentViewSet(AppointmentActionsMixin, WalkInMixin, viewsets.ModelVie
 
         ordering = params.get("ordering")
         if ordering == "-date":
-            return queryset.order_by("-appointment_date", "-appointment_time")
+            return queryset.order_by("-appointment_date", "-appointment_time", "-id")
         return queryset
 
     def create(self, request, *args, **kwargs):
+        is_public_request = not (request.user and request.user.is_authenticated)
         serializer = self.get_serializer(data=request.data)
         try:
             serializer.is_valid(raise_exception=True)
@@ -189,6 +199,18 @@ class AppointmentViewSet(AppointmentActionsMixin, WalkInMixin, viewsets.ModelVie
             new_status=appointment.status,
             detail={"source": appointment.source},
         )
+
+        # Acknowledge a public request immediately. Sent after the appointment
+        # is committed, and a delivery failure is recorded rather than raised -
+        # the booking is already saved and the patient is owed nothing further
+        # for the clinic's mail server being down.
+        notification = None
+        if is_public_request and appointment.status == Appointment.Status.PENDING:
+            notification = notify(
+                appointment,
+                AppointmentNotification.Type.BOOKING_RECEIVED,
+                dedupe_key="booking_received",
+            )
         if appointment.slot_override:
             record_event(
                 appointment,
@@ -196,10 +218,13 @@ class AppointmentViewSet(AppointmentActionsMixin, WalkInMixin, viewsets.ModelVie
                 request=request,
                 reason=appointment.slot_override_reason,
             )
-        return Response(
-            AppointmentSerializer(appointment, context=self.get_serializer_context()).data,
-            status=status.HTTP_201_CREATED,
-        )
+        body = AppointmentSerializer(
+            appointment, context=self.get_serializer_context()
+        ).data
+        # The public confirmation screen uses this to tell the patient where the
+        # acknowledgement went, and to be honest when it could not be sent.
+        body["notification"] = notification_payload(notification)
+        return Response(body, status=status.HTTP_201_CREATED)
 
     def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()

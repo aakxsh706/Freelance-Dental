@@ -102,6 +102,7 @@ class AppointmentNotification(TimeStampedModel):
         CONFIRMATION = "confirmation", "Confirmation"
         RESCHEDULE = "reschedule", "Reschedule"
         CANCELLATION = "cancellation", "Cancellation"
+        REQUEST_DECLINED = "request_declined", "Request could not be confirmed"
         REMINDER = "reminder", "Reminder"
 
     class Status(models.TextChoices):

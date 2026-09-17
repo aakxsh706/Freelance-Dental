@@ -229,7 +229,21 @@ export function AppointmentDetailPage() {
           <CardTitle>Appointment</CardTitle>
           <dl className="flex flex-col gap-2.5 text-sm">
             <Row label="Status" value={<StatusBadge status={appointment.status} />} />
-            <Row label="Date" value={formatDateShort(appointment.appointment_date)} />
+            {appointment.was_moved_before_confirming && (
+              <Row
+                label="Requested"
+                value={
+                  <span className="text-(--color-ink-soft)">
+                    {formatDateShort(appointment.requested_date)} ·{' '}
+                    {formatTimeOfDay(appointment.requested_time)}
+                  </span>
+                }
+              />
+            )}
+            <Row
+              label={appointment.was_moved_before_confirming ? 'Scheduled' : 'Date'}
+              value={formatDateShort(appointment.appointment_date)}
+            />
             <Row label="Time" value={formatTimeOfDay(appointment.appointment_time)} />
             <Row label="Reason" value={appointment.reason} />
             <Row label="Source" value={sourceLabels[appointment.source] ?? appointment.source} />
