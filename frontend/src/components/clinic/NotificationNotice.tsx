@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, MailX } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, MailX, Terminal } from 'lucide-react'
 import type { NotificationOutcome } from '../../types'
 
 /**
@@ -21,10 +21,37 @@ export function NotificationNotice({
   if (!outcome) return null
 
   if (outcome.status === 'sent') {
+    // Django reports a successful send for a console/in-memory backend, which
+    // printed the message and discarded it. Saying "email sent" there would
+    // leave staff believing a patient was told something they were not.
+    if (outcome.delivery_configured === false) {
+      return (
+        <div className="flex items-start gap-2 rounded-lg border border-(--color-border) bg-(--color-surface) px-3 py-2">
+          <Terminal
+            className="mt-0.5 h-4 w-4 shrink-0 text-(--color-ink-soft)"
+            strokeWidth={1.75}
+          />
+          <div className="text-sm">
+            <p className="font-medium text-(--color-ink)">
+              Email was not delivered &mdash; no mail server configured
+            </p>
+            <p className="text-(--color-ink-soft)">
+              The message for {outcome.recipient || 'the patient'} was written to the server
+              console instead of being sent. Set the EMAIL_* values in{' '}
+              <code className="rounded bg-(--color-bg) px-1 py-0.5 text-xs">backend/.env</code> to
+              send real email.
+            </p>
+          </div>
+        </div>
+      )
+    }
     return (
       <p className="flex items-center gap-2 text-sm text-(--color-success)">
         <CheckCircle2 className="h-4 w-4 shrink-0" strokeWidth={2} />
         {successLabel}
+        {outcome.recipient && (
+          <span className="text-(--color-ink-soft)">&mdash; {outcome.recipient}</span>
+        )}
       </p>
     )
   }

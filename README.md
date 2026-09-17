@@ -43,7 +43,7 @@ Sign in at `/clinic/login` with the credentials `seed_clinic` reports
 (`DENTIST_USERNAME` / `DENTIST_PASSWORD` in `backend/.env`).
 
 ```bash
-cd backend  && ./venv/bin/python manage.py test clinic   # 121 tests
+cd backend  && ./venv/bin/python manage.py test clinic   # 124 tests
 cd frontend && npx tsc -b && npx oxlint && npm run build
 ```
 
@@ -177,15 +177,38 @@ offering an action that would be refused.
 
 ## Email
 
-Appointment confirmations, reschedules and cancellations go out through
-Django's mail framework, configured entirely from the environment
-(`EMAIL_HOST`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, …). With `DEBUG=True`
-the backend defaults to Django's console backend, so the whole notification
-workflow - including its failure paths - can be exercised without an SMTP
-server and without ever emailing a real patient from a development machine.
+**By default nothing is sent.** With `DEBUG=True` the mail backend is Django's
+console backend: messages are composed in full and printed to the terminal
+running the backend, so the whole workflow can be exercised without an SMTP
+server and a development machine can never email a real patient by accident.
 
-Message wording lives in `clinic/templates/clinic/email/` as plain-text
-templates, so the clinic can reword them without touching Python.
+Because Django reports a *successful send* for that backend, the clinic screens
+distinguish "sent" from "actually delivered" and say plainly when no mail
+server is configured - otherwise staff see "confirmation email sent" and
+reasonably assume the patient has it.
+
+To send real email, set in `backend/.env` and restart the backend:
+
+```bash
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST_USER=clinic@example.com
+EMAIL_HOST_PASSWORD=<app password>
+DEFAULT_FROM_EMAIL=Belin's Dental Clinic <clinic@example.com>
+```
+
+Gmail rejects ordinary account passwords; create an App Password at
+<https://myaccount.google.com/apppasswords> (2-Step Verification must be on).
+`DEFAULT_FROM_EMAIL` should be the authenticated address, or Google rewrites
+or rejects it.
+
+Check the configuration without booking anything:
+
+```bash
+./venv/bin/python manage.py send_test_email you@example.com
+```
+
+Message wording lives in `clinic/templates/clinic/email/` as paired plain-text
+and HTML templates, so the clinic can reword them without touching Python.
 
 ## Production
 

@@ -58,6 +58,24 @@ TEMPLATES = {
 }
 
 
+# Backends that accept a message and never deliver it. Django reports these as
+# a successful send, which is true from its point of view and badly misleading
+# from the clinic's: staff see "confirmation email sent" and reasonably assume
+# the patient has it. Every outcome this module reports says which of the two
+# actually happened.
+NON_DELIVERING_BACKENDS = (
+    "django.core.mail.backends.console.EmailBackend",
+    "django.core.mail.backends.locmem.EmailBackend",
+    "django.core.mail.backends.dummy.EmailBackend",
+    "django.core.mail.backends.filebased.EmailBackend",
+)
+
+
+def delivery_is_real() -> bool:
+    """False when mail is being printed or discarded rather than sent."""
+    return settings.EMAIL_BACKEND not in NON_DELIVERING_BACKENDS
+
+
 def _format_date(value) -> str:
     return value.strftime("%d %B %Y") if value else ""
 

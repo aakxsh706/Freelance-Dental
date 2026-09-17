@@ -853,3 +853,55 @@ class PublicBookingSecurityTests(WorkflowTestCase):
             self.client.get(f"/api/appointments/{appointment_id}/history/").status_code,
             (401, 403),
         )
+
+
+class DeliveryReportingTests(WorkflowTestCase):
+    """Reporting a message as delivered when it was not is how a clinic ends up
+    believing a patient was told something they never received."""
+
+    def setUp(self):
+        super().setUp()
+        self.client.force_authenticate(self.receptionist)
+        self.appointment_id = self.book_public().data["id"]
+        self.client.force_authenticate(self.receptionist)
+
+    def test_a_non_delivering_backend_is_reported_as_not_delivered(self):
+        with self.settings(
+            EMAIL_BACKEND="django.core.mail.backends.console.EmailBackend"
+        ):
+            response = self.client.post(
+                f"/api/appointments/{self.appointment_id}/confirm/", {}, format="json"
+            )
+        outcome = response.data["notification"]
+        # Django's own view of it is a successful send...
+        self.assertEqual(outcome["status"], "sent")
+        # ...but the clinic is told the truth.
+        self.assertFalse(outcome["delivered"])
+        self.assertFalse(outcome["delivery_configured"])
+
+    def test_a_real_backend_is_reported_as_delivered(self):
+        with self.settings(
+            EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend"
+        ):
+            # locmem is itself non-delivering, so patch the check to stand in
+            # for a configured SMTP backend while still capturing the message.
+            with mock.patch("clinic.notifications.delivery_is_real", return_value=True):
+                response = self.client.post(
+                    f"/api/appointments/{self.appointment_id}/confirm/", {}, format="json"
+                )
+        outcome = response.data["notification"]
+        self.assertEqual(outcome["status"], "sent")
+        self.assertTrue(outcome["delivered"])
+
+    def test_known_non_delivering_backends(self):
+        from ..notifications import delivery_is_real
+
+        for backend in [
+            "django.core.mail.backends.console.EmailBackend",
+            "django.core.mail.backends.locmem.EmailBackend",
+            "django.core.mail.backends.dummy.EmailBackend",
+        ]:
+            with self.settings(EMAIL_BACKEND=backend):
+                self.assertFalse(delivery_is_real(), backend)
+        with self.settings(EMAIL_BACKEND="django.core.mail.backends.smtp.EmailBackend"):
+            self.assertTrue(delivery_is_real())

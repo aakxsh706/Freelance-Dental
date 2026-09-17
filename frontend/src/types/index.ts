@@ -92,6 +92,12 @@ export interface NotificationOutcome {
   recipient?: string
   detail: string
   sent_at?: string | null
+  /** Whether the message actually left the server. False when a console or
+   * in-memory backend is configured, where Django reports a successful send
+   * for a message it printed and discarded. */
+  delivered?: boolean
+  /** False when no real mail backend is configured at all. */
+  delivery_configured?: boolean
 }
 
 export interface AppointmentActionResult {

@@ -53,15 +53,31 @@ def notification_payload(notification):
     Always present in an action's response, never an exception, so the frontend
     can say "saved, but we could not email them" rather than implying the whole
     operation failed.
+
+    `delivered` is deliberately separate from `status`. With a console or
+    in-memory backend Django reports a successful send for a message that was
+    printed and thrown away; reporting that to staff as "email sent" is how a
+    clinic ends up believing a patient was told something they were not.
     """
+    from ..notifications import delivery_is_real
+
+    real = delivery_is_real()
     if notification is None:
-        return {"attempted": False, "status": "not_sent", "detail": ""}
+        return {
+            "attempted": False,
+            "status": "not_sent",
+            "detail": "",
+            "delivered": False,
+            "delivery_configured": real,
+        }
     return {
         "attempted": notification.status != AppointmentNotification.Status.SKIPPED,
         "status": notification.status,
         "recipient": notification.recipient_email,
         "detail": notification.failure_reason,
         "sent_at": notification.sent_at,
+        "delivered": real and notification.status == AppointmentNotification.Status.SENT,
+        "delivery_configured": real,
     }
 
 
