@@ -30,7 +30,7 @@ class ClinicSettings(models.Model):
 
     clinic_name = models.CharField(max_length=200, default="Dr. Belin's Dentistry")
     phone = models.CharField(max_length=30, default="+91 88707 74432")
-    email = models.EmailField(blank=True, default="drbelinroshia@gmail.com")
+    email = models.EmailField(blank=True, default="belindentistry@gmail.com")
     address = models.CharField(
         max_length=300,
         default=(
