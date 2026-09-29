@@ -21,7 +21,7 @@ def noop_reverse(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("clinic", "0003_rename_clinic_and_new_address"),
+        ("clinic", "0010_alter_clinicsettings_address_and_more"),
     ]
 
     operations = [
