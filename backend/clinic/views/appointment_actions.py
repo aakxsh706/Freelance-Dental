@@ -422,6 +422,8 @@ class AppointmentActionsMixin:
 
     @action(detail=True, methods=["get"])
     def history(self, request, pk=None):
+        from ..notifications import delivery_is_real
+
         appointment = self._appointment()
         return Response(
             {
@@ -431,6 +433,11 @@ class AppointmentActionsMixin:
                 "notifications": AppointmentNotificationSerializer(
                     appointment.notifications.all(), many=True
                 ).data,
+                # A row stored as "sent" only means Django accepted it. With a
+                # console backend that message was printed and discarded, and a
+                # log of green "Sent" badges for mail nobody received is worse
+                # than no log at all.
+                "delivery_configured": delivery_is_real(),
             }
         )
 

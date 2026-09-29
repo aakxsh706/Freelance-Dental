@@ -68,6 +68,9 @@ export function AppointmentDetailPage() {
   const appointment = edited ?? fetched.data
   const [history, setHistory] = useState<AppointmentHistoryEntry[]>([])
   const [notifications, setNotifications] = useState<AppointmentNotificationRow[]>([])
+  // False when no mail server is configured, in which case a stored
+  // "sent" means the message was printed to the server console.
+  const [deliveryConfigured, setDeliveryConfigured] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [outcome, setOutcome] = useState<{ message: string; notification: NotificationOutcome } | null>(
@@ -83,6 +86,7 @@ export function AppointmentDetailPage() {
       .then((data) => {
         setHistory(data.history)
         setNotifications(data.notifications)
+        setDeliveryConfigured(data.delivery_configured !== false)
       })
       .catch(() => undefined)
   }, [id])
@@ -399,6 +403,16 @@ export function AppointmentDetailPage() {
         <Card padded={false}>
           <div className="px-5 pt-5">
             <CardTitle>Notifications</CardTitle>
+            {!deliveryConfigured && notifications.length > 0 && (
+              <p className="-mt-2 mb-3 text-sm text-(--color-ink-soft)">
+                No mail server is configured, so these messages were written to the server console
+                rather than sent. Set the EMAIL_* values in{' '}
+                <code className="rounded bg-(--color-surface) px-1 py-0.5 text-xs">
+                  backend/.env
+                </code>
+                .
+              </p>
+            )}
           </div>
           {notifications.length === 0 ? (
             <p className="px-5 pb-5 text-sm text-(--color-ink-soft)">
@@ -424,14 +438,16 @@ export function AppointmentDetailPage() {
                   </div>
                   <Pill
                     tone={
-                      row.status === 'sent'
-                        ? 'accent'
-                        : row.status === 'failed'
-                          ? 'danger'
+                      row.status === 'failed'
+                        ? 'danger'
+                        : row.status === 'sent' && deliveryConfigured
+                          ? 'accent'
                           : 'neutral'
                     }
                   >
-                    {row.status_display}
+                    {row.status === 'sent' && !deliveryConfigured
+                      ? 'Not delivered'
+                      : row.status_display}
                   </Pill>
                 </li>
               ))}

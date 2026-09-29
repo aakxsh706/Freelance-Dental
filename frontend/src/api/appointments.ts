@@ -204,6 +204,9 @@ export function getAppointmentHistory(id: number) {
   return apiRequest<{
     history: AppointmentHistoryEntry[]
     notifications: AppointmentNotificationRow[]
+    /** False when no real mail backend is configured, in which case a stored
+     * "sent" means the message was printed to the server console. */
+    delivery_configured: boolean
   }>(`/appointments/${id}/history/`, { auth: true })
 }
 
