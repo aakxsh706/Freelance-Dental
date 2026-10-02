@@ -29,7 +29,6 @@ from ..serializers import (
     StaffAppointmentWriteSerializer,
 )
 from ..permissions import can_override_slot
-from ..notifications import notify
 from .appointment_actions import (
     AppointmentActionsMixin,
     WalkInMixin,
@@ -160,7 +159,6 @@ class AppointmentViewSet(AppointmentActionsMixin, WalkInMixin, viewsets.ModelVie
         return queryset
 
     def create(self, request, *args, **kwargs):
-        is_public_request = not (request.user and request.user.is_authenticated)
         serializer = self.get_serializer(data=request.data)
         try:
             serializer.is_valid(raise_exception=True)
@@ -200,17 +198,12 @@ class AppointmentViewSet(AppointmentActionsMixin, WalkInMixin, viewsets.ModelVie
             detail={"source": appointment.source},
         )
 
-        # Acknowledge a public request immediately. Sent after the appointment
-        # is committed, and a delivery failure is recorded rather than raised -
-        # the booking is already saved and the patient is owed nothing further
-        # for the clinic's mail server being down.
+        # Booking deliberately sends no email. The clinic writes to the patient
+        # once, when the appointment is actually confirmed - an acknowledgement
+        # for a request that may still be declined was more noise than signal.
+        # The response still carries a notification payload so the public
+        # confirmation screen keeps its shape; it simply reports nothing sent.
         notification = None
-        if is_public_request and appointment.status == Appointment.Status.PENDING:
-            notification = notify(
-                appointment,
-                AppointmentNotification.Type.BOOKING_RECEIVED,
-                dedupe_key="booking_received",
-            )
         if appointment.slot_override:
             record_event(
                 appointment,

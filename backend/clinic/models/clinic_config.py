@@ -8,7 +8,7 @@ class Dentist(models.Model):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="dentist"
     )
-    name = models.CharField(max_length=150, default="Dr. Belin [Placeholder]")
+    name = models.CharField(max_length=150, default="Dr. Belin Roshia")
     title = models.CharField(
         max_length=150, default="Dentist & Oral Healthcare Professional"
     )
@@ -40,7 +40,13 @@ class ClinicSettings(models.Model):
     )
     google_maps_embed_url = models.URLField(
         blank=True,
-        help_text="Google Maps embed URL (src of an <iframe>). Placeholder until the real clinic location is provided.",
+        max_length=500,
+        default=(
+            "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d500!2d77.0214229!3d11.1014248!2m3!"
+            "1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3ba8f94e0565a521%3A0x4741f01b6c83c8b3!2sDr.%"
+            "20Belin%27s%20Dentistry!5e0!3m2!1sen!2sin!4v1759150000000!5m2!1sen!2sin"
+        ),
+        help_text="Google Maps embed URL (src of an <iframe>), from Share > Embed a map.",
     )
     google_maps_url = models.URLField(
         blank=True,

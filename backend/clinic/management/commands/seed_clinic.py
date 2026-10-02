@@ -52,7 +52,7 @@ class Command(BaseCommand):
         dentist, dentist_created = Dentist.objects.get_or_create(
             user=user,
             defaults={
-                "name": "Dr. Belin [Placeholder]",
+                "name": "Dr. Belin Roshia",
                 "title": "Dentist & Oral Healthcare Professional",
                 "email": email,
                 "phone": "+91 88707 74432",

@@ -13,14 +13,15 @@ export const fallbackClinicSettings: ClinicSettings = {
   email: 'belindentistry@gmail.com',
   address:
     'No. 23, SS Towers, Kurumbapalayam, Sathy road, Sarkarsamakulam PO, Coimbatore 641107, Tamilnadu',
-  google_maps_embed_url: '',
+  google_maps_embed_url:
+    'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d500!2d77.0214229!3d11.1014248!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3ba8f94e0565a521%3A0x4741f01b6c83c8b3!2sDr.%20Belin%27s%20Dentistry!5e0!3m2!1sen!2sin!4v1759150000000!5m2!1sen!2sin',
   google_maps_url: 'https://maps.app.goo.gl/1sA41VZLgnzXNse86',
   slot_duration_minutes: 30,
 }
 
 export const fallbackDentist: Dentist = {
   id: 0,
-  name: 'Dr. Belin [Placeholder]',
+  name: 'Dr. Belin Roshia',
   title: 'Dentist & Oral Healthcare Professional',
   email: '',
   phone: '+91 88707 74432',

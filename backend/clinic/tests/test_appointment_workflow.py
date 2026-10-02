@@ -102,18 +102,24 @@ class AcceptanceTests(WorkflowTestCase):
         self.assertIsNotNone(appointment.confirmed_at)
         self.assertEqual(appointment.confirmed_by, self.receptionist)
 
-    def test_booking_sends_an_acknowledgement_that_is_not_a_confirmation(self):
-        """The receipt must not read as though the appointment is booked."""
-        self.book_public()
-        self.assertEqual(len(mail.outbox), 1)
-        acknowledgement = mail.outbox[0]
-        self.assertIn("Request Received", acknowledgement.subject)
-        self.assertNotIn("Confirmed", acknowledgement.subject)
-        self.assertIn("not a confirmation", acknowledgement.body)
+    def test_booking_sends_no_email(self):
+        """Confirmation is the only email a patient gets.
+
+        A booking is a request the clinic may still decline, so acknowledging
+        it was dropped deliberately - the patient hears from the clinic once,
+        when the appointment is actually confirmed.
+        """
+        response = self.book_public()
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertFalse(response.data["notification"]["attempted"])
+        self.assertFalse(
+            AppointmentNotification.objects.filter(
+                notification_type="booking_received"
+            ).exists()
+        )
 
     def test_confirmation_emails_the_patient(self):
         appointment_id = self.book_public().data["id"]
-        mail.outbox.clear()  # drop the booking acknowledgement
         self.client.force_authenticate(self.receptionist)
         response = self.client.post(f"/api/appointments/{appointment_id}/confirm/", {}, format="json")
 
@@ -736,7 +742,7 @@ class HistoryEndpointTests(WorkflowTestCase):
         self.assertIn("created", events)
         types = {n["notification_type"] for n in response.data["notifications"]}
         self.assertIn("confirmation", types)
-        self.assertIn("booking_received", types)
+        self.assertNotIn("booking_received", types)
 
     def test_history_requires_staff(self):
         appointment_id = self.book_public().data["id"]

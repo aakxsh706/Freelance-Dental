@@ -1,9 +1,8 @@
-import { UserRound } from 'lucide-react'
 import { getDentistProfile } from '../../api/dentist'
+import drBelinPortrait from '../../assets/DrBelinRoshia_Portrait.png'
 import { fallbackDentist } from '../../data/clinicConfig'
 import { useFetch } from '../../hooks/useFetch'
 import { Container } from '../ui/Container'
-import { ImagePlaceholder } from '../ui/ImagePlaceholder'
 import { Reveal } from '../ui/Reveal'
 
 export function DentistProfile() {
@@ -14,10 +13,13 @@ export function DentistProfile() {
     <section id="about" className="scroll-mt-20 py-20 sm:py-28">
       <Container className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
         <Reveal>
-          <ImagePlaceholder
-            label="Dentist Photo — Placeholder"
-            icon={UserRound}
-            className="aspect-[4/5] w-full"
+          {/* Alt text describes the photograph itself, so it stays correct
+              regardless of what the fetched profile says. */}
+          <img
+            src={drBelinPortrait}
+            alt="Dr. Belin Roshia, Chief Dental Surgeon"
+            draggable={false}
+            className="aspect-[4/5] w-full select-none rounded-2xl border border-(--color-border) object-cover"
           />
         </Reveal>
 
