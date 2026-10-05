@@ -57,6 +57,9 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # Serves the built frontend and Django admin assets without a separate
+    # web server - the point of the single-process bundle.
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -123,6 +126,29 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# The bundled build. `npm run build` writes here; Django serves it so a clinic
+# PC runs one process on one port instead of a Python server, a Node server
+# and a CORS configuration between them.
+FRONTEND_BUILD_DIR = env(
+    "FRONTEND_BUILD_DIR", default=str(BASE_DIR.parent / "frontend" / "dist")
+)
+
+# Vite emits hashed filenames under assets/. Collected into STATIC_ROOT so one
+# WhiteNoise configuration serves both Django's own admin assets and the app.
+if Path(FRONTEND_BUILD_DIR).exists():
+    STATICFILES_DIRS = [Path(FRONTEND_BUILD_DIR)]
+
+# Hashed, far-future-cacheable copies, and gzip for the slow clinic link.
+# Only in production: the hashing manifest makes a missing file a hard error,
+# which is unhelpful while developing.
+if not DEBUG:
+    STORAGES = {
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"
+        },
+    }
 
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
@@ -196,6 +222,18 @@ DEFAULT_FROM_EMAIL = env(
 )
 
 
+# Patient sheet sync
+# The clinic runs offline; patient contact details are pushed to a Google
+# Sheet whenever a connection happens to exist. Both blank means the feature
+# is off and the management command says so rather than failing obscurely.
+# The URL is an Apps Script web app bound to the sheet; the token is the
+# only thing guarding it, since the deployment must be reachable without a
+# Google login. Both live in .env, which is never committed.
+
+PATIENT_SHEET_WEBHOOK_URL = env("PATIENT_SHEET_WEBHOOK_URL", default="")
+PATIENT_SHEET_WEBHOOK_TOKEN = env("PATIENT_SHEET_WEBHOOK_TOKEN", default="")
+
+
 # Uploads
 # Patient documents are x-rays and scans, so the ceiling is generous, but an
 # unbounded upload is a denial-of-service vector.
@@ -221,5 +259,9 @@ if not DEBUG:
         "SECURE_HSTS_INCLUDE_SUBDOMAINS", default=True
     )
     SECURE_HSTS_PRELOAD = env.bool("SECURE_HSTS_PRELOAD", default=True)
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
+    # Overridable for the same reason as the redirect above: an on-premise
+    # clinic PC serves http://localhost with no certificate, and a browser
+    # will not send a Secure cookie over plain HTTP - which locks staff out
+    # of the Django admin on the very machine holding the records.
+    SESSION_COOKIE_SECURE = env.bool("SESSION_COOKIE_SECURE", default=True)
+    CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", default=True)

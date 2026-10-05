@@ -47,6 +47,36 @@ cd backend  && ./venv/bin/python manage.py test clinic   # 124 tests
 cd frontend && npx tsc -b && npx oxlint && npm run build
 ```
 
+## Patient sheet sync
+
+The clinic runs offline. Patient **contact details only** (code, name, phone,
+email, city) are pushed to a Google Sheet whenever the machine has a
+connection - no clinical data is sent.
+
+The receiving end is an Apps Script web app bound to the sheet, so there is no
+Google Cloud project, no service account and no key file to manage.
+
+Setup, once:
+
+1. Open the sheet, then **Extensions > Apps Script**.
+2. Replace the editor contents with `docs/patient_sheet_webhook.gs`.
+3. Set `TOKEN` at the top of the script to the value of
+   `PATIENT_SHEET_WEBHOOK_TOKEN` in `backend/.env`. They must match.
+4. **Deploy > New deployment > Web app**, with
+   *Execute as* **Me** and *Who has access* **Anyone**. Copy the Web app URL
+   into `PATIENT_SHEET_WEBHOOK_URL` in `backend/.env`.
+
+```bash
+cd backend
+./venv/bin/python manage.py sync_patients_to_sheet --dry-run   # works offline
+./venv/bin/python manage.py sync_patients_to_sheet
+```
+
+Running it twice in a row should report `already up to date`. That is the
+point: rows are matched by patient code, so the command is safe on a timer,
+on reconnect, or by hand, in any order and any number of times. Being offline
+is reported and exits 0 rather than failing.
+
 ## Layout
 
 ```
