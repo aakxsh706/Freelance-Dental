@@ -8,7 +8,9 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
+# dist IS committed. The clinic PC installs with no internet and no Node, so
+# the built app has to travel with the project rather than be built there.
+# Rebuild with `npm run build` and commit the result when the frontend changes.
 dist-ssr
 *.local
 .env

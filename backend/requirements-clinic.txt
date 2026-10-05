@@ -1,0 +1,19 @@
+# Runtime dependencies for the offline clinic PC.
+#
+# Deliberately not requirements.txt:
+#   - psycopg2-binary is a Postgres driver and a compiled extension. The
+#     clinic runs SQLite, and a compiled wheel would have to match the exact
+#     Python version and architecture on that machine.
+#   - gunicorn imports fcntl and cannot run on Windows at all.
+#
+# What is left is pure Python, so the wheels in vendor/wheels work on any
+# operating system and any Python 3.x. That is what makes an offline install
+# possible without building anything on the clinic machine.
+
+Django>=5,<6
+djangorestframework>=3.15,<4
+djangorestframework-simplejwt>=5.3,<6
+django-cors-headers>=4.4,<5
+django-environ>=0.11,<1
+whitenoise>=6.6,<7
+waitress>=3,<4
