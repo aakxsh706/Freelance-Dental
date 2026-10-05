@@ -1,115 +1,106 @@
 @echo off
 REM ===========================================================================
-REM  Dr. Belin's Dentistry - OFFLINE install (Windows)
+REM  Dr. Belin's Dentistry - install (Windows)
 REM
-REM  Downloads nothing. No internet needed, no Node needed.
+REM  Downloads NOTHING and needs nothing installed on this PC.
+REM  No internet, no Python, no Node.
 REM
-REM  Everything it installs is already in this folder:
-REM    vendor\wheels    - the Python packages
-REM    frontend\dist    - the web app, already built
-REM
-REM  Only requirement: Python 3.11 or newer, with "Add Python to PATH"
-REM  ticked during its setup.
+REM  Everything is already in this folder:
+REM    vendor\python-*-embed-amd64.zip  - Python itself
+REM    vendor\wheels\                   - the Python packages
+REM    frontend\dist\                   - the web app, already built
 REM
 REM  Run this once. Then use start-clinic.bat every day.
 REM ===========================================================================
 
-setlocal
+setlocal EnableDelayedExpansion
 cd /d "%~dp0"
 
+set PYZIP=vendor\python-3.12.10-embed-amd64.zip
+set RUNTIME=runtime
+set PY=%RUNTIME%\python\python.exe
+
 echo.
-echo  Dr. Belin's Dentistry - offline install
-echo  =======================================
+echo  Dr. Belin's Dentistry - install
+echo  ===============================
 echo.
 
-where python >nul 2>&1
-if errorlevel 1 goto :nopython
+if not exist "%PYZIP%" goto :incomplete
+if not exist "vendor\wheels" goto :incomplete
+if not exist "frontend\dist\index.html" goto :incomplete
 
-if not exist "vendor\wheels" goto :nowheels
-if not exist "frontend\dist\index.html" goto :nodist
-
-echo  [1/5] Creating the Python environment
-if not exist "backend\venv\Scripts\python.exe" (
-    REM venv uses the pip bundled inside Python itself - no download.
-    python -m venv backend\venv
-    if errorlevel 1 goto :nopython
+echo  [1/6] Unpacking Python
+if not exist "%PY%" (
+    if exist "%RUNTIME%\python" rmdir /s /q "%RUNTIME%\python"
+    powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+        "Expand-Archive -LiteralPath '%PYZIP%' -DestinationPath '%RUNTIME%\python' -Force"
+    if errorlevel 1 goto :failed
 )
+if not exist "%PY%" goto :failed
 
-echo  [2/5] Installing packages from vendor\wheels
-REM --no-index is the important part: pip is forbidden from contacting the
-REM internet and must satisfy everything from the local folder. If a package
-REM were missing this fails loudly here rather than silently reaching out.
-backend\venv\Scripts\python.exe -m pip install --no-index --find-links=vendor\wheels -r backend\requirements-clinic.txt --quiet --disable-pip-version-check
-if errorlevel 1 goto :pipfailed
+echo  [2/6] Pointing Python at the bundled packages
+REM python312._pth replaces the usual sys.path. Paths are relative to the
+REM folder holding python.exe. Without ..\..\backend the interpreter cannot
+REM import config.settings, because a path file also turns off the automatic
+REM "script's own directory" entry.
+> "%RUNTIME%\python\python312._pth" echo python312.zip
+>> "%RUNTIME%\python\python312._pth" echo .
+>> "%RUNTIME%\python\python312._pth" echo ..\lib
+>> "%RUNTIME%\python\python312._pth" echo ..\..\backend
+>> "%RUNTIME%\python\python312._pth" echo import site
 
-echo  [3/5] Creating the settings file
-backend\venv\Scripts\python.exe backend\make_env.py
+echo  [3/6] Installing packages
+REM A wheel is a zip laid out exactly as site-packages expects, and every
+REM dependency here is pure Python, so extracting them IS the install. The
+REM embeddable Python has no pip and bootstrapping one would need the network.
+"%PY%" vendor\unpack_wheels.py "%CD%\%RUNTIME%\lib"
 if errorlevel 1 goto :failed
 
-echo  [4/5] Preparing the database
-backend\venv\Scripts\python.exe backend\manage.py migrate --noinput
+echo  [4/6] Creating the settings file
+"%PY%" backend\make_env.py
+if errorlevel 1 goto :failed
+
+echo  [5/6] Preparing the database
+"%PY%" backend\manage.py migrate --noinput
 if errorlevel 1 goto :failed
 REM Dentist login, clinic details and working hours. Leaves an existing
 REM clinic's data alone, so re-running this is safe.
-backend\venv\Scripts\python.exe backend\manage.py seed_clinic
+"%PY%" backend\manage.py seed_clinic
 if errorlevel 1 goto :failed
 
-echo  [5/5] Collecting the web files
-REM Copies frontend\dist into backend\staticfiles. Local file copying only.
+echo  [6/6] Collecting the web files
 set DEBUG=False
 set SECRET_KEY=setup-step-only-not-used-at-runtime-aaaaaaaaaaaaaaaaaaaaaa
-backend\venv\Scripts\python.exe backend\manage.py collectstatic --noinput --clear
+"%PY%" backend\manage.py collectstatic --noinput --clear
 if errorlevel 1 goto :failed
 
 echo.
 echo  ==========================================================
 echo   Installed. Nothing was downloaded.
 echo.
-echo   Start the clinic software with:  start-clinic.bat
+echo   Start the clinic software:  start-clinic.bat
 echo.
 echo   Then sign in at http://localhost:8000/clinic/login
 echo     Username:  drbelin
 echo     Password:  change-this-password
 echo.
-echo   CHANGE THAT PASSWORD. It is a public default:
-echo     backend\venv\Scripts\python.exe backend\manage.py changepassword drbelin
+echo   CHANGE THAT PASSWORD - it is a public default:
+echo     runtime\python\python.exe backend\manage.py changepassword drbelin
 echo  ==========================================================
 echo.
 pause
 exit /b 0
 
-:nopython
+:incomplete
 echo.
-echo  ERROR: Python was not found on this PC.
+echo  ERROR: this copy of the project is incomplete.
 echo.
-echo  Install Python 3.11 or newer from python.org, and tick
-echo  "Add Python to PATH" on the first screen of its installer.
-echo  Then run this file again.
+echo  Expected to find:
+echo    %PYZIP%
+echo    vendor\wheels\
+echo    frontend\dist\index.html
 echo.
-pause
-exit /b 1
-
-:nowheels
-echo.
-echo  ERROR: the vendor\wheels folder is missing.
-echo  This copy of the project is incomplete - re-download it in full.
-echo.
-pause
-exit /b 1
-
-:nodist
-echo.
-echo  ERROR: frontend\dist is missing, so the web app has not been built.
-echo  This copy of the project is incomplete - re-download it in full.
-echo.
-pause
-exit /b 1
-
-:pipfailed
-echo.
-echo  ERROR: a Python package could not be installed from vendor\wheels.
-echo  Nothing was downloaded - that is deliberate. The folder is likely
-echo  incomplete, so re-download the project in full.
+echo  Download the project again, in full.
 echo.
 pause
 exit /b 1
