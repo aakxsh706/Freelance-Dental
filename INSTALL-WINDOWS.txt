@@ -1,0 +1,129 @@
+===========================================================================
+  Dr. Belin's Dentistry - installing on the clinic computer
+===========================================================================
+
+  You do NOT need the internet.
+  You do NOT need to install Python, Node, or anything else.
+
+  Everything needed is already inside this folder.
+
+
+---------------------------------------------------------------------------
+  STEP 1 - Put the folder on the computer
+---------------------------------------------------------------------------
+
+  Copy the file  Freelance-Dental-main.zip  onto the computer
+  (a USB stick is fine).
+
+  Right-click it and choose  "Extract All..."
+
+  Extract it to a simple place, for example:
+
+      C:\BelinClinic
+
+  IMPORTANT: Actually extract it. Do not open the zip and run the
+  files from inside the preview window - it will not work.
+
+
+---------------------------------------------------------------------------
+  STEP 2 - Install (do this ONCE)
+---------------------------------------------------------------------------
+
+  Open the folder you just extracted.
+
+  Double-click:     install-clinic.bat
+
+  A black window opens and shows six steps. Wait for it to finish.
+  It ends with:
+
+      Installed. Nothing was downloaded.
+
+  This takes a minute or two.
+
+  If a blue box says "Windows protected your PC":
+      click  "More info"  then  "Run anyway"
+  This happens because the file is not signed. It is not a problem.
+
+
+---------------------------------------------------------------------------
+  STEP 3 - Start the software (do this EVERY DAY)
+---------------------------------------------------------------------------
+
+  Double-click:     start-clinic.bat
+
+  A black window opens and your web browser opens automatically at:
+
+      http://localhost:8000
+
+  LEAVE THE BLACK WINDOW OPEN while the clinic is using the software.
+  Closing that window stops the software.
+
+  To stop at the end of the day, just close the black window.
+
+
+---------------------------------------------------------------------------
+  STEP 4 - Sign in
+---------------------------------------------------------------------------
+
+  Staff login page:   http://localhost:8000/clinic/login
+
+      Username:   drbelin
+      Password:   change-this-password
+
+
+---------------------------------------------------------------------------
+  STEP 5 - Change the password (IMPORTANT, do this straight away)
+---------------------------------------------------------------------------
+
+  The password above is a public default. Anyone who has seen the
+  project knows it. Change it before real patient details are entered.
+
+  In the extracted folder, click the address bar at the top of the
+  window, type   cmd   and press Enter. A black window opens.
+
+  Then type this and press Enter:
+
+      runtime\python\python.exe backend\manage.py changepassword drbelin
+
+  It asks for the new password twice. Nothing appears on screen while
+  you type the password - that is normal.
+
+
+===========================================================================
+  IF SOMETHING GOES WRONG
+===========================================================================
+
+  "The software has not been installed yet on this PC"
+      Step 2 was not done, or was not finished. Run
+      install-clinic.bat again.
+
+  "This copy of the project is incomplete"
+      The zip did not extract fully. Delete the folder, extract the
+      zip again, and retry.
+
+  The browser says it cannot connect
+      The black window from Step 3 was closed. Double-click
+      start-clinic.bat again.
+
+  Anything else
+      Take a photo of the black window showing the error and send it.
+      The install stops at a numbered step, so the step number says
+      which part failed.
+
+
+===========================================================================
+  NOTES
+===========================================================================
+
+  * This is a Windows 64-bit computer only.
+
+  * The patient list starts empty. Records from any other computer do
+    not come across in this zip.
+
+  * Email confirmations and the Google Sheet sync are switched off
+    until their settings are filled into  backend\.env
+
+  * The clinic's data lives in  backend\db.sqlite3
+    Back that one file up regularly. It is the patient records.
+
+===========================================================================
