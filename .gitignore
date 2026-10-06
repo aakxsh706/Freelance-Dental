@@ -4,3 +4,6 @@ Thumbs.db
 .idea/
 *.swp
 runtime/
+.vercel/
+__pycache__/
+*.pyc

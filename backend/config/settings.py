@@ -110,6 +110,50 @@ _database_url = env("DATABASE_URL", default="") or f"sqlite:///{BASE_DIR / 'db.s
 DATABASES = {"default": environ.Env.db_url_config(_database_url)}
 
 
+# Vercel
+# Serverless: the filesystem is wiped between requests and there is no shell.
+# Everything here exists to stop that costing the clinic data quietly.
+
+ON_VERCEL = bool(env("VERCEL", default="") or env("VERCEL_URL", default=""))
+
+# Patient x-rays and scans are a FileField writing to MEDIA_ROOT. On a
+# read-only, per-request filesystem the upload appears to succeed and the file
+# is gone by the next request. The endpoint refuses the upload instead, so a
+# missing x-ray is noticed at the moment it matters rather than months later.
+PATIENT_DOCUMENTS_ENABLED = env.bool(
+    "PATIENT_DOCUMENTS_ENABLED", default=not ON_VERCEL
+)
+
+if ON_VERCEL:
+    _vercel_host = env("VERCEL_URL", default="")
+    # Each deployment gets its own hostname, so the host cannot be pinned in
+    # advance; ALLOWED_HOSTS would reject every preview build.
+    ALLOWED_HOSTS = list(
+        dict.fromkeys(ALLOWED_HOSTS + [h for h in (_vercel_host, ".vercel.app") if h])
+    )
+    CSRF_TRUSTED_ORIGINS = [
+        o
+        for o in (
+            f"https://{_vercel_host}" if _vercel_host else "",
+            "https://*.vercel.app",
+        )
+        if o
+    ]
+    # Vercel terminates TLS at the edge and forwards plain HTTP, so Django
+    # must read the original scheme from the header or it redirects forever.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+    if "sqlite" in DATABASES["default"].get("ENGINE", ""):
+        raise ImproperlyConfigured(
+            "DATABASE_URL is not set, so this deployment would use SQLite on a "
+            "filesystem that is erased between requests - every patient and "
+            "appointment entered would be lost within minutes.\n"
+            "Create a Postgres database (Vercel Postgres, Neon or Supabase) "
+            "and set DATABASE_URL in the Vercel project's environment "
+            "variables."
+        )
+
+
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},

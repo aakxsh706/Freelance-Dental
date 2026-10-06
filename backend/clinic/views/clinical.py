@@ -2,7 +2,9 @@
 
 from datetime import date as date_cls
 
+from django.conf import settings
 from django.db.models import Count, Q
+from rest_framework import status as http_status
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -244,6 +246,29 @@ class PatientDocumentViewSet(AuditedModelMixin, viewsets.ModelViewSet):
     pagination_class = OptInPageNumberPagination
     lookup_field = "uuid"
     audit_fields = ("title", "document_type")
+
+    def create(self, request, *args, **kwargs):
+        """Refuse the upload where the file could not survive being stored.
+
+        Documents are a FileField writing to MEDIA_ROOT. On a serverless host
+        the filesystem is wiped between requests: the upload would return 201
+        and the x-ray would be gone by the next one. Staff would have no
+        reason to doubt it until someone went looking for the image.
+
+        Reading records is unaffected - only creating a new one is blocked.
+        """
+        if not settings.PATIENT_DOCUMENTS_ENABLED:
+            return Response(
+                {
+                    "detail": (
+                        "Document uploads are turned off on this server because "
+                        "it cannot store files permanently. Upload x-rays and "
+                        "scans from the clinic computer instead."
+                    )
+                },
+                status=http_status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        return super().create(request, *args, **kwargs)
 
     def get_queryset(self):
         queryset = super().get_queryset()
