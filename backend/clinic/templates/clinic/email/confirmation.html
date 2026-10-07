@@ -1,0 +1,12 @@
+{% extends "clinic/email/_base.html" %}{% block content %}
+<p style="margin:0 0 12px;">Hello {{ first_name }},</p>
+<p style="margin:0 0 4px;">Your appointment request with {{ clinic.clinic_name }} has been
+<strong style="color:#2f4f4a;">confirmed</strong>.</p>
+{% include "clinic/email/_detail_box.html" with box_label="Confirmed Appointment" box_date=appointment_date box_time=appointment_time %}
+{% if moved_before_confirming %}
+<p style="margin:0 0 12px;color:#5b6467;">You originally requested {{ requested_time }} on
+{{ requested_date }}. The time above is your confirmed appointment.</p>
+{% endif %}
+<p style="margin:0 0 12px;">Please arrive a few minutes before your scheduled appointment.</p>
+<p style="margin:0;color:#5b6467;">If you need to change or cancel, please contact the clinic.</p>
+{% endblock %}

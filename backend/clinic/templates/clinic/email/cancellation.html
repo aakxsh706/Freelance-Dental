@@ -1,0 +1,6 @@
+{% extends "clinic/email/_base.html" %}{% block content %}
+<p style="margin:0 0 12px;">Hello {{ first_name }},</p>
+<p style="margin:0 0 4px;">Your appointment with {{ clinic.clinic_name }} has been cancelled.</p>
+{% include "clinic/email/_detail_box.html" with box_label="Cancelled Appointment" box_date=appointment_date box_time=appointment_time %}
+<p style="margin:0;">Please contact the clinic if you would like to book another appointment.</p>
+{% endblock %}

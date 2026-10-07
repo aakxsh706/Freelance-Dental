@@ -1,0 +1,15 @@
+Hello {{ first_name }},
+
+Your appointment request with {{ clinic.clinic_name }} has been confirmed.
+
+Date:
+{{ appointment_date }}
+
+Time:
+{{ appointment_time }}
+{% if moved_before_confirming %}
+Please note: you originally requested {{ requested_time }} on {{ requested_date }}.
+The time above is your confirmed appointment.
+{% endif %}
+Please arrive a few minutes before your scheduled appointment.
+{% include "clinic/email/_signature.txt" %}

@@ -1,0 +1,15 @@
+Hello {{ first_name }},
+
+We have received your appointment request.
+
+Requested Date:
+{{ appointment_date }}
+
+Requested Time:
+{{ appointment_time }}
+
+Your request is currently awaiting confirmation from the clinic. This email is
+a receipt, not a confirmation - your appointment is not booked yet.
+
+You will receive another email once the clinic has confirmed it.
+{% include "clinic/email/_signature.txt" %}

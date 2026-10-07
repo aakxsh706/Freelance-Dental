@@ -1,0 +1,14 @@
+Hello {{ first_name }},
+
+Your appointment with {{ clinic.clinic_name }} has been rescheduled.
+
+Previous Appointment:
+{{ previous_date }}
+{{ previous_time }}
+
+New Appointment:
+{{ appointment_date }}
+{{ appointment_time }}
+
+If you have any questions, please contact the clinic.
+{% include "clinic/email/_signature.txt" %}

@@ -1,0 +1,13 @@
+Hello {{ first_name }},
+
+Thank you for your appointment request with {{ clinic.clinic_name }}.
+
+Unfortunately we are unable to confirm the time you asked for:
+
+{{ appointment_date }}
+{{ appointment_time }}
+{% if reason %}
+{{ reason }}
+{% endif %}
+Please contact the clinic and we will be glad to arrange another suitable time.
+{% include "clinic/email/_signature.txt" %}
