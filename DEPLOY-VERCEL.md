@@ -5,15 +5,48 @@ own database — the two do not share data.
 
 ## What you upload
 
-**Nothing by hand.** Vercel deploys from GitHub, and everything it needs is
-already committed:
+**Nothing by hand.** Vercel deploys from GitHub, and there is no build step:
+the frontend bundle and Django's static files are committed, so Vercel only
+imports the Python function and serves it.
 
 | File | Purpose |
 |---|---|
 | `vercel.json` | Routes every request to the Python function |
 | `api/index.py` | The entry point Vercel imports |
-| `vercel-build.sh` | Installs packages, builds the frontend, migrates, seeds |
-| `requirements.txt` | Python packages (at the repo root, where Vercel looks) |
+| `requirements.txt` | Python packages, at the root where Vercel looks |
+| `frontend/dist/` | The built website, committed |
+| `backend/staticfiles/` | What Django serves, committed |
+
+`vercel-build.sh` is **not** run by Vercel. Run it yourself after changing the
+frontend, then commit what it produces:
+
+```bash
+./vercel-build.sh
+git add frontend/dist backend/staticfiles && git commit -m "Rebuild assets"
+```
+
+Every build-time task is a way a deploy can fail - installing packages,
+reaching npm, importing Django, connecting to the database. The output is
+identical every time, so it is produced on a machine where it can be checked.
+
+## Migrations: run once, from your own machine
+
+Not from the build. A build container that loses its database connection
+halfway leaves a clinical schema half-applied.
+
+With the Postgres connection string from the next section:
+
+```bash
+export DATABASE_URL='postgresql://...'
+export SECRET_KEY='<the same one you set in Vercel>'
+export DEBUG=False
+export ALLOWED_HOSTS=localhost
+backend/venv/bin/python backend/manage.py migrate
+backend/venv/bin/python backend/manage.py seed_clinic
+```
+
+Do this once before the first deploy, and again whenever a release adds a
+migration.
 
 ## Before you start: the database
 
