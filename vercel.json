@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "bash vercel-build.sh",
+  "buildCommand": "echo 'Nothing to build - the frontend and static files are committed.'",
   "outputDirectory": "public",
   "functions": {
     "api/index.py": {

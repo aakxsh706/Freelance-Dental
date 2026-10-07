@@ -4,12 +4,13 @@ __pycache__/
 backend/venv/
 backend/.env
 backend/db.sqlite3
-backend/staticfiles/
+# backend/staticfiles/ IS committed - see vercel.json. Pre-building it
+# locally means Vercel has no build step that can fail.
 backend/media/
 
 # Node
 frontend/node_modules/
-frontend/dist/
+# frontend/dist IS committed, for the same reason.
 frontend/.env
 
 # Vercel
