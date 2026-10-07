@@ -1,4 +1,6 @@
 import os
+import secrets
+import string
 from datetime import time
 
 from django.contrib.auth import get_user_model
@@ -34,7 +36,12 @@ class Command(BaseCommand):
         )
         if created:
             if not password:
-                password = User.objects.make_random_password()
+                # Django removed User.objects.make_random_password() in 5.1.
+                # This path only runs when DENTIST_PASSWORD is unset, which is
+                # exactly the fresh-install case - so the old call turned a
+                # first deploy into a crash rather than a working login.
+                alphabet = string.ascii_letters + string.digits
+                password = "".join(secrets.choice(alphabet) for _ in range(16))
                 self.stdout.write(
                     self.style.WARNING(
                         "DENTIST_PASSWORD was not set - generated a random password "
