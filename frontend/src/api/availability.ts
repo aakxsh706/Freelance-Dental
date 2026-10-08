@@ -4,8 +4,15 @@ import type {
   DentistAvailability,
 } from '../types'
 import { apiRequest } from './client'
+import { localAvailability, usingSheetBooking } from './sheetBooking'
 
 export function getAvailability(date: string) {
+  // On the public static site there is no server to ask, so the open times
+  // are worked out from the clinic's published hours instead. See
+  // sheetBooking.ts for why every slot comes back as available.
+  if (usingSheetBooking()) {
+    return Promise.resolve(localAvailability(date))
+  }
   return apiRequest<AvailabilityResponse>(`/availability/?date=${date}`)
 }
 

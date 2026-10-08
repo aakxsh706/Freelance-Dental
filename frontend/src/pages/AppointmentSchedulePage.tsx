@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { createAppointment } from '../api/appointments'
 import { ApiError } from '../api/client'
+import { BookingError, submitSheetBooking, usingSheetBooking } from '../api/sheetBooking'
 import { AvailabilityCalendar } from '../components/appointment/AvailabilityCalendar'
 import { HappyToothCompanion } from '../components/appointment/HappyToothCompanion'
 import { StepIndicator } from '../components/appointment/StepIndicator'
 import { TimeSlotSelector } from '../components/appointment/TimeSlotSelector'
 import { Button } from '../components/ui/Button'
 import { Container } from '../components/ui/Container'
+import type { Appointment } from '../types'
 import type { BookingMascotState } from '../data/bookingMascot'
 import { clinicTimings } from '../data/clinicConfig'
 import { formatDateLong, todayIso } from '../lib/format'
@@ -60,7 +62,7 @@ export function AppointmentSchedulePage() {
     setSubmitting(true)
     setSubmitError(null)
     try {
-      const appointment = await createAppointment({
+      const request = {
         patient_name: details.patient_name,
         phone: details.phone,
         email: details.email,
@@ -68,12 +70,25 @@ export function AppointmentSchedulePage() {
         notes: details.notes,
         appointment_date: activeDate,
         appointment_time: selectedTime,
-      })
-      setConfirmedAppointment(appointment)
+      }
+
+      if (usingSheetBooking()) {
+        // Static site: the request goes to the clinic's sheet, and there is
+        // no saved appointment to show back. The confirmation screen is given
+        // what the patient entered, which is all it displays anyway.
+        await submitSheetBooking(request)
+        setConfirmedAppointment({
+          ...request,
+          id: 0,
+          status: 'pending',
+        } as unknown as Appointment)
+      } else {
+        setConfirmedAppointment(await createAppointment(request))
+      }
       navigate('/appointment/confirmation')
     } catch (err) {
       setSubmitError(
-        err instanceof ApiError
+        err instanceof ApiError || err instanceof BookingError
           ? err.message
           : 'We could not submit your appointment request. Please try again.',
       )

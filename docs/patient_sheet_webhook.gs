@@ -31,9 +31,23 @@ function doPost(e) {
 
     var payload = JSON.parse(e.postData.contents);
 
-    // The deployment has to be readable by "Anyone" for the clinic to reach
-    // it without a Google login, so the token is the only thing standing
-    // between this URL and anyone who finds it. Check it first, always.
+    // A booking comes from the public website, so its JavaScript would have to
+    // carry any token it needed - which would publish that token to everyone.
+    // Bookings are therefore unauthenticated, and deliberately limited: they
+    // only ever APPEND to the Bookings sheet. They cannot read anything, and
+    // they cannot touch the patient sheet.
+    if (payload.action === 'booking') {
+      var lock = LockService.getScriptLock();
+      lock.waitLock(30000);
+      try {
+        return reply(recordBooking(payload));
+      } finally {
+        lock.releaseLock();
+      }
+    }
+
+    // Everything below writes patient data and runs from the clinic's own
+    // machine, so it must carry the token. Checked before anything else.
     if (payload.token !== TOKEN) {
       return reply({ ok: false, error: 'Bad token.' });
     }
@@ -155,4 +169,68 @@ function reply(object) {
   return ContentService
     .createTextOutput(JSON.stringify(object))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+
+// ---------------------------------------------------------------------------
+//  Bookings from the public website
+// ---------------------------------------------------------------------------
+
+var BOOKING_SHEET = 'Bookings';
+var BOOKING_COLUMNS = [
+  'Received', 'Name', 'Phone', 'Email', 'Preferred Date',
+  'Preferred Time', 'Reason', 'Status'
+];
+
+function recordBooking(payload) {
+  var name = clean(payload.patient_name, 120);
+  var phone = clean(payload.phone, 30);
+  var date = clean(payload.appointment_date, 20);
+  var time = clean(payload.appointment_time, 20);
+
+  // The website validates too, but anyone can post here, so a row is never
+  // written from a request that is missing what the clinic needs to call back.
+  if (!name || !phone || !date || !time) {
+    return { ok: false, error: 'Name, phone, date and time are all required.' };
+  }
+
+  var book = SpreadsheetApp.getActiveSpreadsheet()
+    .getSheetByName(BOOKING_SHEET);
+  if (!book) {
+    book = SpreadsheetApp.getActiveSpreadsheet().insertSheet(BOOKING_SHEET);
+  }
+
+  if (book.getLastRow() < 1) {
+    var width = BOOKING_COLUMNS.length;
+    book.getRange(1, 1, 1, width).setValues([BOOKING_COLUMNS]);
+    book.getRange(1, 1, 1, width).setFontWeight('bold');
+    book.setFrozenRows(1);
+  }
+
+  var row = [
+    Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'),
+    name,
+    phone,
+    clean(payload.email, 150),
+    date,
+    time,
+    clean(payload.reason, 500),
+    'New'
+  ];
+
+  var line = book.getLastRow() + 1;
+  var range = book.getRange(line, 1, 1, row.length);
+  // Text format, so a phone number keeps its leading + and a date stays
+  // exactly as the patient chose it.
+  range.setNumberFormat('@');
+  range.setValues([row]);
+
+  return { ok: true, booked: true, row: line };
+}
+
+function clean(value, maxLength) {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  return String(value).replace(/[\r\n\t]+/g, ' ').trim().slice(0, maxLength);
 }

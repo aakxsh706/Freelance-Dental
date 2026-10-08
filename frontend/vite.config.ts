@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
-export default defineConfig(({ command }) => ({
+export default defineConfig(() => ({
   // Production build only. In the bundle Django serves the built assets from
   // /static/, so the build has to emit that prefix - otherwise index.html asks
   // for /assets/..., Django's single-page-app catch-all answers those with
@@ -13,7 +13,10 @@ export default defineConfig(({ command }) => ({
   // Scoped to `build` because `base` applies to the dev server too. Set
   // globally it makes `npm run dev` redirect / to /static/, and the usual
   // http://localhost:6565 stops working.
-  base: command === 'build' ? '/static/' : '/',
+  // Served from the domain root by Vercel as a static site, so no prefix.
+  // (The Windows bundle serves the app through Django, where assets live
+  // under /static/ - that build lives in the other repository.)
+  base: '/',
   plugins: [react(), tailwindcss()],
   server: {
     host: '0.0.0.0',
