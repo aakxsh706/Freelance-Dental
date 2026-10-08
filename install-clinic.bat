@@ -80,7 +80,7 @@ echo   Installed. Nothing was downloaded.
 echo.
 echo   Start the clinic software:  start-clinic.bat
 echo.
-echo   Then sign in at http://localhost:8000/clinic/login
+echo   Then sign in at http://localhost:8777/clinic/login
 echo     Username:  drbelin
 echo     Password:  change-this-password
 echo.

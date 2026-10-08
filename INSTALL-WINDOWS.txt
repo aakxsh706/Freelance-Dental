@@ -53,7 +53,7 @@
 
   A black window opens and your web browser opens automatically at:
 
-      http://localhost:8000
+      http://localhost:8777
 
   LEAVE THE BLACK WINDOW OPEN while the clinic is using the software.
   Closing that window stops the software.
@@ -65,7 +65,7 @@
   STEP 4 - Sign in
 ---------------------------------------------------------------------------
 
-  Staff login page:   http://localhost:8000/clinic/login
+  Staff login page:   http://localhost:8777/clinic/login
 
       Username:   drbelin
       Password:   change-this-password

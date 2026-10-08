@@ -13,7 +13,7 @@ setlocal
 cd /d "%~dp0"
 
 set PY=runtime\python\python.exe
-set PORT=8000
+set PORT=8777
 REM This PC only. Patient records should not be reachable from the rest of the
 REM clinic network by default. To let another machine (say, reception) connect,
 REM set LISTEN to 0.0.0.0 AND add this PC's LAN address to ALLOWED_HOSTS in

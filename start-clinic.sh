@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 PY="${PYTHON:-python3}"
-export PORT="${PORT:-8000}"
+export PORT="${PORT:-8777}"
 export LISTEN="${LISTEN:-127.0.0.1}"
 export PYTHONPATH="$PWD/runtime/lib:$PWD/backend"
 

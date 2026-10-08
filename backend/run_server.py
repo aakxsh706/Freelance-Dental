@@ -68,7 +68,7 @@ def _poll_appointment_sheet_forever() -> None:
 
 
 def main() -> int:
-    port = int(os.environ.get("PORT", "8000"))
+    port = int(os.environ.get("PORT", "8777"))
     # This machine only by default. Patient records should not be reachable
     # from the rest of the clinic network unless that is asked for.
     listen = os.environ.get("LISTEN", "127.0.0.1")
