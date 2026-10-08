@@ -1,48 +1,25 @@
-# Dr. Belin's Dentistry - clinic portal
+# Dr. Belin's Dentistry — public website
 
-The hosted copy: public booking site and staff portal, served by Django on
-Vercel with a Postgres database.
+The public site: clinic information, and an appointment request form.
 
-This is deliberately separate from the offline Windows bundle, which lives in
-the main repository and remains the clinic's system of record. The two have
-their own databases and do not share data.
+Static. No server, no database. Bookings post to the clinic's Google Apps
+Script, which writes them into the Bookings sheet the dentist reads.
 
-## Deploying
-
-See **DEPLOY-VERCEL.md** - it has the full click-by-click walkthrough.
-
-In short: create a Postgres database, import this repository at
-<https://vercel.com/new>, set the environment variables, deploy.
-
-## Layout
+The staff portal (patients, appointments, prescriptions, audit) is **not**
+here — it is the Windows software installed at the clinic, in the main
+repository.
 
 ```
-api/index.py        the entry point Vercel imports
-vercel.json         routes every request to that function
-vercel-build.sh     installs packages, builds the frontend, migrates, seeds
-requirements.txt    Python packages, at the root where Vercel looks
-backend/            the Django application
-frontend/           the React app (built during deployment)
-docs/               the Google Sheet webhook script
+frontend/       the React site (frontend/dist is committed and served)
+docs/           the Google Apps Script that receives bookings
+vercel.json     static hosting config
+DEPLOY.md       how to deploy and connect the domain
 ```
 
-## Running it locally
+## Local development
 
 ```bash
-python3 -m venv backend/venv
-backend/venv/bin/pip install -r requirements.txt
-cp backend/.env.example backend/.env    # then fill in SECRET_KEY
-backend/venv/bin/python backend/manage.py migrate
-backend/venv/bin/python backend/manage.py seed_clinic
-(cd frontend && npm install && npm run dev)
-backend/venv/bin/python backend/manage.py runserver 127.0.0.1:4545
+cd frontend
+npm install
+npm run dev
 ```
-
-## Two limits of the hosted copy
-
-**Patient document uploads are off.** X-rays are files on disk, and a
-serverless host does not keep them. The endpoint refuses with a clear message
-rather than accepting an upload it cannot store. Upload from the clinic PC.
-
-**The Google Sheet sync has nowhere to run.** It is a management command and
-serverless has no scheduler. Run it from the clinic PC.

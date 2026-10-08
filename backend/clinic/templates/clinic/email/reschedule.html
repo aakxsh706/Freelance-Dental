@@ -1,7 +1,0 @@
-{% extends "clinic/email/_base.html" %}{% block content %}
-<p style="margin:0 0 12px;">Hello {{ first_name }},</p>
-<p style="margin:0 0 4px;">Your appointment with {{ clinic.clinic_name }} has been rescheduled.</p>
-{% include "clinic/email/_detail_box.html" with box_label="Previous Appointment" box_date=previous_date box_time=previous_time %}
-{% include "clinic/email/_detail_box.html" with box_label="New Appointment" box_date=appointment_date box_time=appointment_time %}
-<p style="margin:0;">If you have any questions, please contact the clinic.</p>
-{% endblock %}

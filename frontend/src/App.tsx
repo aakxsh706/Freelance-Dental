@@ -76,7 +76,27 @@ function clinicPage(element: React.ReactNode, requires?: Parameters<typeof Clini
   )
 }
 
+// The public website is deployed on its own, with no backend. The staff
+// portal only works against the clinic's installed software, so on the public
+// build its routes are not registered at all - a login screen that cannot
+// log anyone in is worse than no login screen.
+const PUBLIC_SITE = import.meta.env.VITE_PUBLIC_SITE === 'true'
+
 function App() {
+  if (PUBLIC_SITE) {
+    return (
+      <Routes>
+        <Route element={<PublicLayout />}>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/appointment" element={<AppointmentPage />} />
+          <Route path="/appointment/schedule" element={<AppointmentSchedulePage />} />
+          <Route path="/appointment/confirmation" element={<AppointmentConfirmationPage />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    )
+  }
+
   return (
     <Routes>
       {/* Public website - unchanged. */}

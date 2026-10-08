@@ -1,7 +1,12 @@
 import type { Appointment, Dentist, DashboardStats } from '../types'
-import { apiRequest, buildQuery } from './client'
+import { fallbackDentist } from '../data/clinicConfig'
+import { API_BASE_URL, apiRequest, buildQuery } from './client'
 
 export function getDentistProfile() {
+  // See getClinicSettings - no backend on the public site.
+  if (!API_BASE_URL) {
+    return Promise.resolve(fallbackDentist)
+  }
   return apiRequest<Dentist>('/dentist/profile/')
 }
 

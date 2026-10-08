@@ -1,8 +1,0 @@
-{% if clinic.phone %}
-If you need to make any changes, please contact the clinic on {{ clinic.phone }}.
-{% else %}
-If you need to make any changes, please contact the clinic.
-{% endif %}
-Thank you,
-{{ clinic.clinic_name }}{% if clinic.address %}
-{{ clinic.address }}{% endif %}
