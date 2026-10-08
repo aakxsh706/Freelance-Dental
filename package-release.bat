@@ -37,7 +37,7 @@ echo  ============================
 echo.
 
 echo  [1/4] Building the app (needs internet)
-call build-clinic.bat
+call "%~dp0build-clinic.bat"
 if errorlevel 1 goto :failed
 
 set STAGING=dist-release\staging
