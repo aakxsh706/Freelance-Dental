@@ -46,7 +46,7 @@ import zipfile
 from pathlib import Path
 
 GITHUB_API_URL = (
-    "https://api.github.com/repos/aakxsh706/Freelance-Dental/releases/latest"
+    "https://api.github.com/repos/belindentistry-gittt/Clinic-Portal/releases/latest"
 )
 USER_AGENT = "belin-clinic-update-check/1.0"
 API_TIMEOUT_SECONDS = 8
