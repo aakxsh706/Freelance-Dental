@@ -1,14 +1,15 @@
 """Appointment endpoints.
 
-Shared between the public website (create only) and the clinic software
-(everything else) - one appointment table, one set of availability rules, no
-synchronisation step between the two.
+Clinic-staff-facing only: every action, including create, requires a staff
+login. The public website used to create appointments here directly; it has
+moved to a separate, differently-authenticated service, which is expected to
+submit appointments through a webhook of its own rather than this API.
 """
 
 from datetime import date as date_cls, timedelta
 
 from django.db.models import Count, Prefetch, Q
-from rest_framework import permissions, status, viewsets
+from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
@@ -19,7 +20,6 @@ from ..matching import build_patient_from_booking, normalize_phone
 from ..models import Appointment, AppointmentNotification, Patient
 from ..permissions import IsClinicStaff
 from ..serializers import (
-    AppointmentCreateSerializer,
     ConflictingAppointmentSerializer,
     SlotConflict,
     AppointmentResolvePatientSerializer,
@@ -47,13 +47,7 @@ AUDIT_FIELDS = (
 
 
 class AppointmentViewSet(AppointmentActionsMixin, WalkInMixin, viewsets.ModelViewSet):
-    """
-    - create: public (a patient booking an appointment)
-    - everything else: clinic staff
-
-    A booking made on the website is visible here the moment it is saved;
-    there is no import step, because both surfaces read the same table.
-    """
+    """Every action - including create - requires a clinic staff login."""
 
     queryset = (
         Appointment.objects.select_related("patient", "confirmed_by", "checked_in_by")
@@ -79,11 +73,9 @@ class AppointmentViewSet(AppointmentActionsMixin, WalkInMixin, viewsets.ModelVie
 
     def get_serializer_class(self):
         if self.action == "create":
-            # Staff-created appointments choose a patient explicitly; public
-            # bookings go through matching instead.
-            if self.request.user and self.request.user.is_authenticated:
-                return StaffAppointmentWriteSerializer
-            return AppointmentCreateSerializer
+            # Staff choose a patient explicitly rather than going through
+            # matching, same as any other staff-made booking.
+            return StaffAppointmentWriteSerializer
         if self.action == "partial_update":
             fields = set(self.request.data.keys())
             # A status-only PATCH keeps the original narrow contract; anything
@@ -94,8 +86,6 @@ class AppointmentViewSet(AppointmentActionsMixin, WalkInMixin, viewsets.ModelVie
         return AppointmentSerializer
 
     def get_permissions(self):
-        if self.action == "create":
-            return [permissions.AllowAny()]
         return [IsClinicStaff()]
 
     def get_queryset(self):

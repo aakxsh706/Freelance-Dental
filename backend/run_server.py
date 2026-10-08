@@ -9,8 +9,11 @@ Reads PORT and LISTEN from the environment so the launcher scripts stay the
 single place those are set.
 """
 
+import logging
 import os
 import sys
+import threading
+import time
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -22,6 +25,46 @@ if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+
+
+def _poll_appointment_sheet_forever() -> None:
+    """Runs for as long as the server is up, polling the booking sheet every
+    APPOINTMENT_SHEET_POLL_INTERVAL_SECONDS (an env var in backend/.env,
+    defaulting to 300 - see config.settings).
+
+    A one-time poll already happens at startup (start-clinic.bat/.sh, right
+    after `migrate`), so this loop covers "while the clinic has the software
+    open" - a booking made mid-morning should not have to wait for the next
+    restart to be picked up. Must never crash the server: any failure,
+    including no internet (the ordinary case on a clinic machine), is logged
+    and this loop simply waits for the next interval and tries again.
+
+    Imports are local to this function because Django must already be set up
+    (via the `from config.wsgi import application` import in main(), below)
+    before clinic.appointment_sheet_poll can touch settings or the database -
+    this function only ever runs as a thread started after that happens.
+    """
+    from django.conf import settings
+
+    from clinic.appointment_sheet_poll import PollError, PollOffline, is_configured, poll
+
+    if not is_configured():
+        # Feature not set up on this machine - nothing to do, and no point
+        # waking up every few minutes to find that out again.
+        return
+
+    interval = settings.APPOINTMENT_SHEET_POLL_INTERVAL_SECONDS
+    logger = logging.getLogger(__name__)
+    while True:
+        time.sleep(interval)
+        try:
+            poll()
+        except PollOffline as exc:
+            logger.info("Appointment sheet poll: %s", exc)
+        except PollError as exc:
+            logger.warning("Appointment sheet poll failed: %s", exc)
+        except Exception:  # noqa: BLE001 - must never take the server down
+            logger.exception("Appointment sheet poll crashed unexpectedly.")
 
 
 def main() -> int:
@@ -50,6 +93,11 @@ def main() -> int:
     print()
     print("    Keep this window open. Close it to stop the software.")
     print()
+
+    # Daemon: it must never keep the process alive on its own, and closing
+    # this window (which ends the process) is how staff stop the software -
+    # the poll loop should not stand in the way of that.
+    threading.Thread(target=_poll_appointment_sheet_forever, daemon=True).start()
 
     # threads: a single dentist and a receptionist, not a public website.
     serve(application, host=listen, port=port, threads=8)

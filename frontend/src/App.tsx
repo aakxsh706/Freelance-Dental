@@ -1,11 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { ClinicLayout } from './components/clinic/ClinicLayout'
-import { PublicLayout } from './components/layout/PublicLayout'
-import { AppointmentConfirmationPage } from './pages/AppointmentConfirmationPage'
-import { AppointmentPage } from './pages/AppointmentPage'
-import { AppointmentSchedulePage } from './pages/AppointmentSchedulePage'
-import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
 import { ClinicRoute } from './routes/ClinicRoute'
 
@@ -79,14 +74,6 @@ function clinicPage(element: React.ReactNode, requires?: Parameters<typeof Clini
 function App() {
   return (
     <Routes>
-      {/* Public website - unchanged. */}
-      <Route element={<PublicLayout />}>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/appointment" element={<AppointmentPage />} />
-        <Route path="/appointment/schedule" element={<AppointmentSchedulePage />} />
-        <Route path="/appointment/confirmation" element={<AppointmentConfirmationPage />} />
-      </Route>
-
       <Route path="/clinic/login" element={<LoginPage />} />
 
       {/* Previous staff URLs. Kept as redirects so existing bookmarks and any
@@ -137,7 +124,7 @@ function App() {
       <Route path="/clinic/settings/*" element={clinicPage(<SettingsPage />)} />
       <Route path="/clinic/audit" element={clinicPage(<AuditPage />, 'can_view_audit')} />
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to="/clinic/login" replace />} />
     </Routes>
   )
 }

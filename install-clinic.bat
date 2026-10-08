@@ -88,7 +88,9 @@ echo   CHANGE THAT PASSWORD - it is a public default:
 echo     runtime\python\python.exe backend\manage.py changepassword drbelin
 echo  ==========================================================
 echo.
-pause
+REM BELIN_SILENT is set when the Windows installer runs this step for you
+REM automatically after setup - nothing is there to press a key, so skip it.
+if not defined BELIN_SILENT pause
 exit /b 0
 
 :incomplete
@@ -102,12 +104,12 @@ echo    frontend\dist\index.html
 echo.
 echo  Download the project again, in full.
 echo.
-pause
+if not defined BELIN_SILENT pause
 exit /b 1
 
 :failed
 echo.
 echo  INSTALL FAILED - see the messages above.
 echo.
-pause
+if not defined BELIN_SILENT pause
 exit /b 1

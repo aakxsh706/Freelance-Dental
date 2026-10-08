@@ -142,6 +142,18 @@ class Appointment(models.Model):
         related_name="created_appointments",
     )
 
+    # The sheet row's own stable id (a UUID the Apps Script generates), set
+    # only on appointments created through the sheet webhook. The idempotency
+    # key for that path: a retried or re-synced row looks up this field before
+    # creating anything, so the same booking can be pushed any number of times
+    # without becoming two appointments. Null for every appointment made any
+    # other way (walk-in, staff-entered, old data) - SQLite and Postgres both
+    # allow any number of NULLs under a unique constraint, so this never
+    # collides with the rows that simply do not use it.
+    external_reference = models.CharField(
+        max_length=100, null=True, blank=True, unique=True
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

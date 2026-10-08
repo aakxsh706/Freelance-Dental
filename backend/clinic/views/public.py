@@ -4,17 +4,12 @@ Kept in their own module so it stays obvious which surface is exposed to the
 internet: anything not in here requires a staff login.
 """
 
-from datetime import date as date_cls
-
-from django.utils.dateparse import parse_date
 from rest_framework import permissions, status
-from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from ..audit import record_audit
-from ..availability import compute_available_slots
 from ..models import ClinicSettings, Dentist
 from ..permissions import ensure_staff_profile
 from ..serializers import ClinicSettingsSerializer, DentistSerializer
@@ -67,28 +62,6 @@ class ClinicSettingsView(APIView):
             changes={k: str(v) for k, v in serializer.validated_data.items()},
         )
         return Response(serializer.data)
-
-
-class AvailabilityView(APIView):
-    """Public: available time slots for a given date.
-
-    GET /api/availability/?date=YYYY-MM-DD
-    """
-
-    permission_classes = [permissions.AllowAny]
-
-    def get(self, request):
-        raw_date = request.query_params.get("date")
-        if not raw_date:
-            raise ValidationError({"date": "A date query parameter is required."})
-        target_date = parse_date(raw_date)
-        if not target_date:
-            raise ValidationError({"date": "Date must be in YYYY-MM-DD format."})
-        if target_date < date_cls.today():
-            return Response({"date": raw_date, "slots": []})
-
-        slots = compute_available_slots(target_date)
-        return Response({"date": raw_date, "slots": slots})
 
 
 class AuditedTokenObtainPairView(TokenObtainPairView):

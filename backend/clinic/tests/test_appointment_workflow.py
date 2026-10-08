@@ -57,12 +57,22 @@ class WorkflowTestCase(APITestCase):
             email="john@example.com",
         )
 
-    def book_public(self, at=time(10, 30), name="John Mathew", email="john@example.com"):
-        """A booking as the public website makes it - unauthenticated."""
-        self.client.force_authenticate(user=None)
+    def book_as_staff(self, at=time(10, 30), name="John Mathew", email="john@example.com"):
+        """Create a fixture appointment the way staff now must.
+
+        Used to be a public, unauthenticated booking that the matcher linked
+        to self.patient by phone; the public website moved to a separate,
+        differently-authenticated service and this backend no longer accepts
+        an anonymous create (see PublicBookingSecurityTests), so staff make
+        this booking instead and - since staff pick a patient explicitly
+        rather than going through the matcher - `patient` is passed
+        explicitly to keep that same link.
+        """
+        self.client.force_authenticate(self.receptionist)
         return self.client.post(
             "/api/appointments/",
             {
+                "patient": str(self.patient.uuid),
                 "patient_name": name,
                 "phone": "+91 98765 43210",
                 "email": email,
@@ -76,14 +86,8 @@ class WorkflowTestCase(APITestCase):
 
 
 class AcceptanceTests(WorkflowTestCase):
-    def test_public_booking_creates_a_pending_appointment(self):
-        response = self.book_public()
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.data["status"], "pending")
-        self.assertEqual(response.data["source"], "website")
-
     def test_anonymous_user_cannot_confirm(self):
-        appointment_id = self.book_public().data["id"]
+        appointment_id = self.book_as_staff().data["id"]
         self.client.force_authenticate(user=None)
         response = self.client.post(f"/api/appointments/{appointment_id}/confirm/", {}, format="json")
         self.assertIn(response.status_code, (401, 403))
@@ -92,7 +96,7 @@ class AcceptanceTests(WorkflowTestCase):
         )
 
     def test_staff_can_confirm_and_it_is_stamped(self):
-        appointment_id = self.book_public().data["id"]
+        appointment_id = self.book_as_staff().data["id"]
         self.client.force_authenticate(self.receptionist)
         response = self.client.post(f"/api/appointments/{appointment_id}/confirm/", {}, format="json")
         self.assertEqual(response.status_code, 200)
@@ -109,7 +113,7 @@ class AcceptanceTests(WorkflowTestCase):
         it was dropped deliberately - the patient hears from the clinic once,
         when the appointment is actually confirmed.
         """
-        response = self.book_public()
+        response = self.book_as_staff()
         self.assertEqual(len(mail.outbox), 0)
         self.assertFalse(response.data["notification"]["attempted"])
         self.assertFalse(
@@ -119,7 +123,7 @@ class AcceptanceTests(WorkflowTestCase):
         )
 
     def test_confirmation_emails_the_patient(self):
-        appointment_id = self.book_public().data["id"]
+        appointment_id = self.book_as_staff().data["id"]
         self.client.force_authenticate(self.receptionist)
         response = self.client.post(f"/api/appointments/{appointment_id}/confirm/", {}, format="json")
 
@@ -134,7 +138,7 @@ class AcceptanceTests(WorkflowTestCase):
         )
 
     def test_confirmation_email_is_sent_as_text_and_html(self):
-        appointment_id = self.book_public().data["id"]
+        appointment_id = self.book_as_staff().data["id"]
         mail.outbox.clear()
         self.client.force_authenticate(self.receptionist)
         self.client.post(f"/api/appointments/{appointment_id}/confirm/", {}, format="json")
@@ -146,7 +150,7 @@ class AcceptanceTests(WorkflowTestCase):
 
     def test_confirmation_states_the_final_time_after_a_reschedule(self):
         """§20: approving a request that was moved must confirm the NEW time."""
-        appointment_id = self.book_public(at=time(10, 30)).data["id"]
+        appointment_id = self.book_as_staff(at=time(10, 30)).data["id"]
         self.client.force_authenticate(self.receptionist)
         self.client.post(
             f"/api/appointments/{appointment_id}/reschedule/",
@@ -167,7 +171,7 @@ class AcceptanceTests(WorkflowTestCase):
         self.assertIn("10:30 AM", body)
 
     def test_the_originally_requested_time_is_preserved(self):
-        appointment_id = self.book_public(at=time(10, 30)).data["id"]
+        appointment_id = self.book_as_staff(at=time(10, 30)).data["id"]
         self.client.force_authenticate(self.receptionist)
         self.client.post(
             f"/api/appointments/{appointment_id}/reschedule/",
@@ -200,7 +204,7 @@ class AcceptanceTests(WorkflowTestCase):
 
     def test_confirmation_survives_an_email_failure(self):
         """The clinic's decision stands even when SMTP does not - §5."""
-        appointment_id = self.book_public().data["id"]
+        appointment_id = self.book_as_staff().data["id"]
         self.client.force_authenticate(self.receptionist)
 
         with mock.patch(
@@ -216,7 +220,7 @@ class AcceptanceTests(WorkflowTestCase):
         self.assertIn("SMTP unavailable", response.data["notification"]["detail"])
 
     def test_confirming_twice_does_not_email_twice(self):
-        appointment_id = self.book_public().data["id"]
+        appointment_id = self.book_as_staff().data["id"]
         self.client.force_authenticate(self.receptionist)
         self.client.post(f"/api/appointments/{appointment_id}/confirm/", {}, format="json")
         second = self.client.post(f"/api/appointments/{appointment_id}/confirm/", {}, format="json")
@@ -231,7 +235,7 @@ class AcceptanceTests(WorkflowTestCase):
     def test_a_blank_booking_email_falls_back_to_the_patient_record(self):
         """Someone who left the field empty is still reachable if we hold an
         address for them - not writing to it would be unhelpful, not careful."""
-        appointment_id = self.book_public(email="").data["id"]
+        appointment_id = self.book_as_staff(email="").data["id"]
         self.client.force_authenticate(self.receptionist)
         response = self.client.post(f"/api/appointments/{appointment_id}/confirm/", {}, format="json")
 
@@ -660,7 +664,7 @@ class CancellationTests(WorkflowTestCase):
         self.client.post(
             f"/api/appointments/{self.appointment.pk}/cancel/", {"reason": "x"}, format="json"
         )
-        self.client.force_authenticate(user=None)
+        self.client.force_authenticate(self.receptionist)
         rebooked = self.client.post(
             "/api/appointments/",
             {
@@ -731,7 +735,7 @@ class EditTests(WorkflowTestCase):
 class HistoryEndpointTests(WorkflowTestCase):
     def test_history_endpoint_returns_events_and_notifications(self):
         self.client.force_authenticate(self.receptionist)
-        appointment_id = self.book_public().data["id"]
+        appointment_id = self.book_as_staff().data["id"]
         self.client.force_authenticate(self.receptionist)
         self.client.post(f"/api/appointments/{appointment_id}/confirm/", {}, format="json")
 
@@ -745,7 +749,7 @@ class HistoryEndpointTests(WorkflowTestCase):
         self.assertNotIn("booking_received", types)
 
     def test_history_requires_staff(self):
-        appointment_id = self.book_public().data["id"]
+        appointment_id = self.book_as_staff().data["id"]
         self.client.force_authenticate(user=None)
         response = self.client.get(f"/api/appointments/{appointment_id}/history/")
         self.assertIn(response.status_code, (401, 403))
@@ -799,7 +803,7 @@ class ResendTests(WorkflowTestCase):
     def setUp(self):
         super().setUp()
         self.client.force_authenticate(self.receptionist)
-        self.appointment_id = self.book_public().data["id"]
+        self.appointment_id = self.book_as_staff().data["id"]
         self.client.force_authenticate(self.receptionist)
 
     def test_resend_retries_a_failed_confirmation_without_changing_status(self):
@@ -831,8 +835,10 @@ class ResendTests(WorkflowTestCase):
 
 
 class PublicBookingSecurityTests(WorkflowTestCase):
-    def test_public_cannot_force_a_confirmed_status(self):
-        """§3: the initial status is the backend's decision, not the payload's."""
+    def test_public_cannot_create_an_appointment(self):
+        """The public website's booking moved to a separate, differently-
+        authenticated service; an anonymous create against this backend must
+        be refused outright, not merely have its status overridden."""
         self.client.force_authenticate(user=None)
         response = self.client.post(
             "/api/appointments/",
@@ -843,17 +849,16 @@ class PublicBookingSecurityTests(WorkflowTestCase):
             },
             format="json",
         )
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.data["status"], "pending")
-        self.assertEqual(Appointment.objects.get(pk=response.data["id"]).status, "pending")
+        self.assertIn(response.status_code, (401, 403))
+        self.assertFalse(Appointment.objects.filter(phone="+91 91111 00000").exists())
 
     def test_public_cannot_read_other_appointments(self):
-        self.book_public()
+        self.book_as_staff()
         self.client.force_authenticate(user=None)
         self.assertIn(self.client.get("/api/appointments/").status_code, (401, 403))
 
     def test_public_cannot_reach_the_notification_history(self):
-        appointment_id = self.book_public().data["id"]
+        appointment_id = self.book_as_staff().data["id"]
         self.client.force_authenticate(user=None)
         self.assertIn(
             self.client.get(f"/api/appointments/{appointment_id}/history/").status_code,
@@ -868,7 +873,7 @@ class DeliveryReportingTests(WorkflowTestCase):
     def setUp(self):
         super().setUp()
         self.client.force_authenticate(self.receptionist)
-        self.appointment_id = self.book_public().data["id"]
+        self.appointment_id = self.book_as_staff().data["id"]
         self.client.force_authenticate(self.receptionist)
 
     def test_a_non_delivering_backend_is_reported_as_not_delivered(self):

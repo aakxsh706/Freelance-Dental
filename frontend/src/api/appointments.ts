@@ -52,6 +52,17 @@ export function listAppointmentsPaged(params: AppointmentQuery = {}) {
   )
 }
 
+/** How many website bookings (from the sheet sync) are still awaiting
+ * confirmation, for the dashboard's "new from website" banner. Only the
+ * paginator's `count` is used, so page_size is kept at 1 - there is no
+ * reason to download the rows themselves just to count them. */
+export function getWebsiteBookingPendingCount() {
+  return apiRequest<Paginated<Appointment>>(
+    `/appointments/${buildQuery({ source: 'website', status: 'pending', page: 1, page_size: 1 })}`,
+    { auth: true },
+  ).then((data) => data.count)
+}
+
 export function getAppointment(id: number) {
   return apiRequest<Appointment>(`/appointments/${id}/`, { auth: true })
 }

@@ -10,7 +10,6 @@ asserted as such.
 from datetime import date, timedelta
 
 from django.test import TestCase
-from rest_framework.test import APITestCase
 
 from ..identifiers import create_with_patient_code, format_patient_code
 from ..matching import (
@@ -21,6 +20,7 @@ from ..matching import (
     resolve_patient_for_booking,
 )
 from ..models import Appointment, DentistAvailability, Patient
+from ..serializers import AppointmentCreateSerializer
 
 
 class NormalizationTests(TestCase):
@@ -158,8 +158,16 @@ class PatientCodeTests(TestCase):
         self.assertEqual(third.patient_code, "BEL-000002")
 
 
-class WebsiteBookingLinksToPatientTests(APITestCase):
-    """§3: a booking made on the website is a clinic record immediately."""
+class WebsiteBookingLinksToPatientTests(TestCase):
+    """§3: a booking made on the website is a clinic record immediately.
+
+    The public website no longer calls this backend directly - it moved to a
+    separate, differently-authenticated service - so there is no longer an
+    HTTP endpoint here that exercises AppointmentCreateSerializer. That
+    serializer is kept as-is for a future webhook to reuse (see its
+    docstring), so these tests call it directly instead of through a view,
+    to keep the matching behaviour it drives under test.
+    """
 
     def setUp(self):
         today = date.today()
@@ -172,9 +180,8 @@ class WebsiteBookingLinksToPatientTests(APITestCase):
         )
 
     def _book(self, name, phone, email="", time="09:00"):
-        return self.client.post(
-            "/api/appointments/",
-            {
+        serializer = AppointmentCreateSerializer(
+            data={
                 "patient_name": name,
                 "phone": phone,
                 "email": email,
@@ -182,14 +189,13 @@ class WebsiteBookingLinksToPatientTests(APITestCase):
                 "appointment_date": self.target.isoformat(),
                 "appointment_time": time,
                 "notes": "",
-            },
-            format="json",
+            }
         )
+        serializer.is_valid(raise_exception=True)
+        return serializer.save()
 
     def test_first_booking_creates_a_patient_and_links_it(self):
-        response = self._book("New Person", "+91 98765 43210")
-        self.assertEqual(response.status_code, 201)
-        appointment = Appointment.objects.get(id=response.data["id"])
+        appointment = self._book("New Person", "+91 98765 43210")
         self.assertIsNotNone(appointment.patient)
         self.assertEqual(appointment.match_status, "created")
         self.assertEqual(appointment.source, Appointment.Source.WEBSITE)
@@ -203,15 +209,14 @@ class WebsiteBookingLinksToPatientTests(APITestCase):
 
     def test_relative_booking_is_flagged_not_merged(self):
         self._book("Priya Nair", "+91 91234 56789", time="09:00")
-        response = self._book("Meera Nair", "+91 91234 56789", time="09:30")
-        appointment = Appointment.objects.get(id=response.data["id"])
+        appointment = self._book("Meera Nair", "+91 91234 56789", time="09:30")
         self.assertIsNone(appointment.patient)
         self.assertEqual(appointment.match_status, "ambiguous")
         # The booking is still honoured - the clinic's ambiguity is not the
         # patient's problem.
-        self.assertEqual(response.status_code, 201)
+        self.assertIsNotNone(appointment.pk)
 
     def test_booking_still_succeeds_and_is_bookable_end_to_end(self):
-        response = self._book("Someone Else", "+91 98888 77777")
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.data["status"], "pending")
+        appointment = self._book("Someone Else", "+91 98888 77777")
+        self.assertIsNotNone(appointment.pk)
+        self.assertEqual(appointment.status, "pending")

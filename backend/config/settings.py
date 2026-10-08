@@ -278,6 +278,32 @@ PATIENT_SHEET_WEBHOOK_URL = env("PATIENT_SHEET_WEBHOOK_URL", default="")
 PATIENT_SHEET_WEBHOOK_TOKEN = env("PATIENT_SHEET_WEBHOOK_TOKEN", default="")
 
 
+# Appointment sheet sync
+# The reverse direction from the patient sheet sync above: the public website
+# (a separate repo/deployment) saves a booking into a Google Sheet, and this
+# backend periodically PULLS new rows from it and turns each one into a real
+# Appointment - see clinic/appointment_sheet_poll.py for why this is a pull
+# rather than a push. The clinic PC runs offline behind a router with no
+# public IP, so Google's servers could never reach back in to push to it;
+# only outbound calls from the clinic PC work, the same constraint
+# PATIENT_SHEET_WEBHOOK_URL above is built around.
+#
+# APPOINTMENT_SHEET_TOKEN is the shared secret for both the Apps Script's own
+# auth check (?token=... on its doGet) and this backend's side of the call -
+# there is no Google login available to either end. Blank means polling is
+# skipped entirely rather than attempted with no way to authenticate.
+
+APPOINTMENT_SHEET_POLL_URL = env("APPOINTMENT_SHEET_POLL_URL", default="")
+APPOINTMENT_SHEET_TOKEN = env("APPOINTMENT_SHEET_TOKEN", default="")
+
+# How often the clinic PC polls the sheet while the software is running (the
+# background loop started by backend/run_server.py). A one-time poll also
+# happens at startup, before this loop begins - see start-clinic.bat/.sh.
+APPOINTMENT_SHEET_POLL_INTERVAL_SECONDS = env.int(
+    "APPOINTMENT_SHEET_POLL_INTERVAL_SECONDS", default=300
+)
+
+
 # Uploads
 # Patient documents are x-rays and scans, so the ceiling is generous, but an
 # unbounded upload is a denial-of-service vector.

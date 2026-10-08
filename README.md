@@ -77,6 +77,64 @@ point: rows are matched by patient code, so the command is safe on a timer,
 on reconnect, or by hand, in any order and any number of times. Being offline
 is reported and exits 0 rather than failing.
 
+## Appointment sheet sync
+
+The reverse direction. The public website now lives in a separate
+repo/deployment and no longer calls this backend directly to book an
+appointment - instead it writes each booking as a row in a Google Sheet, and
+this backend periodically **pulls** new rows from it, turning each one into a
+real `Appointment`. Staff see them land on the clinic dashboard like any
+other pending booking, usually within a few minutes of the booking being
+made - not instantly, since nothing pushes to this backend; it asks.
+
+**Why pull instead of push.** The clinic PC runs this software offline,
+behind a home/office router - no port forwarding, no public IP. A push would
+mean Google's own servers (where Apps Script's `UrlFetchApp.fetch()` runs)
+reaching into `127.0.0.1` on a NAT'd PC, which can never work in the real
+deployment. The clinic PC can already make outbound calls to Google, though
+(see the patient sheet sync above), so instead of waiting for a push it could
+never receive, it asks the sheet what's new - once at startup, then every few
+minutes for as long as the software is running.
+
+The sheet's columns, in order, header in row 1:
+
+| Patient Name | Phone | Email | Reason | Notes | Appointment Date | Appointment Time | Sync ID | Sync Status | Synced At |
+|---|---|---|---|---|---|---|---|---|---|
+
+The website (or whoever/whatever writes rows) fills in the first six. The
+script owns the last three: it assigns the Sync ID itself the first time a
+ready row is seen, and that ID is the idempotency key, so a row that gets
+handed back on more than one poll - which happens on purpose; see the script
+comment - creates at most one appointment. The backend reports every repeat
+as a `duplicate` rather than erroring.
+
+Setup, once:
+
+1. Open the booking sheet, then **Extensions > Apps Script**.
+2. Replace the editor contents with `docs/appointment_sheet_poll.gs`.
+3. Set `TOKEN` at the top of the script to the value of
+   `APPOINTMENT_SHEET_TOKEN` in `backend/.env`. They must match.
+4. **Deploy > New deployment > Web app**, with
+   *Execute as* **Me** and *Who has access* **Anyone**. Copy the Web app URL
+   into `APPOINTMENT_SHEET_POLL_URL` in `backend/.env`.
+
+That's it - no trigger installation step at all. A single `doGet` Web app
+deployment is the entire setup; the backend does the rest on its own schedule
+(`APPOINTMENT_SHEET_POLL_INTERVAL_SECONDS` in `backend/.env`, default 300).
+
+```bash
+cd backend
+./venv/bin/python manage.py poll_appointment_sheet --dry-run   # confirms it's configured, works offline
+./venv/bin/python manage.py poll_appointment_sheet
+```
+
+Running it by hand is also how `start-clinic.bat`/`start-clinic.sh` pick up
+anything already waiting in the sheet before the clinic opens for the day;
+`backend/run_server.py` then repeats it automatically every few minutes for
+as long as the software stays open. Being offline, or the feature not being
+configured yet, is reported and never stops the clinic software from
+starting.
+
 ## Layout
 
 ```
@@ -88,6 +146,9 @@ backend/clinic/
   availability.py  the single definition of "is this slot free"
   appointment_events.py  one place that records an appointment event
   notifications.py       queueing and sending patient emails
+  sheet_sync.py           pushes patient contact details to a Google Sheet
+  appointment_sheet_poll.py  pulls new bookings from a Google Sheet
+  appointment_sheet_sync.py  turns a sheet row into a real Appointment
   permissions.py role-based access
   audit.py       writing the access trail
 

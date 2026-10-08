@@ -1,7 +1,7 @@
-import { AlertCircle, ArrowRight, CalendarClock, Plus, Stethoscope, UserPlus } from 'lucide-react'
+import { AlertCircle, ArrowRight, CalendarClock, Globe, Plus, Stethoscope, UserPlus } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { listAppointmentsNeedingReview } from '../../api/appointments'
+import { getWebsiteBookingPendingCount, listAppointmentsNeedingReview } from '../../api/appointments'
 import { getDashboardStats, getTodayQueue, getUpcomingAppointments } from '../../api/dentist'
 import { AppointmentStatusControl } from '../../components/clinic/AppointmentStatusControl'
 import { NotificationNotice } from '../../components/clinic/NotificationNotice'
@@ -34,6 +34,11 @@ export function ClinicDashboardPage() {
   const queue = useFetch(() => getTodayQueue(), [])
   const upcoming = useFetch(() => getUpcomingAppointments(7), [])
   const review = useFetch(listAppointmentsNeedingReview, [])
+  // Bookings the appointment sheet sync turned into appointments and nobody
+  // has looked at yet - a more specific callout than the general "Pending"
+  // stat tile, which also includes pending bookings made by phone or at the
+  // desk.
+  const websitePending = useFetch(getWebsiteBookingPendingCount, [])
 
   // Status changes made from the queue update in place rather than refetching
   // the whole dashboard - the row the user just acted on should not jump.
@@ -65,6 +70,19 @@ export function ClinicDashboardPage() {
           </>
         }
       />
+
+      {(websitePending.data ?? 0) > 0 && (
+        <Link
+          to="/clinic/appointments?source=website&status=pending"
+          className="mb-4 flex items-center gap-2.5 rounded-xl border border-(--color-accent)/30 bg-(--color-accent-soft) px-4 py-3 hover:border-(--color-accent)/50"
+        >
+          <Globe className="h-4 w-4 shrink-0 text-(--color-accent)" strokeWidth={2} />
+          <p className="flex-1 text-sm font-medium text-(--color-ink)">
+            {websitePending.data} new booking{websitePending.data === 1 ? '' : 's'} from the website
+          </p>
+          <ArrowRight className="h-3.5 w-3.5 text-(--color-accent)" />
+        </Link>
+      )}
 
       {stats.error && <ErrorNote>{stats.error}</ErrorNote>}
 
@@ -147,7 +165,7 @@ export function ClinicDashboardPage() {
           {queue.data && todayAppointments.length === 0 && (
             <EmptyState
               title="Nothing scheduled today"
-              hint="Bookings made on the website appear here as soon as they are submitted."
+              hint="Bookings made on the website are picked up automatically, usually within a few minutes."
             />
           )}
 

@@ -24,9 +24,21 @@ if not exist "%PY%" goto :notinstalled
 if not exist "backend\.env" goto :notinstalled
 if not exist "backend\staticfiles" goto :notinstalled
 
+REM Checks GitHub for a newer release and installs it before anything else
+REM starts. Always offline-safe: with no connection it just says so and
+REM continues - see backend\update_check.py.
+"%PY%" backend\update_check.py
+
 REM Applies any database changes that came with a new version. Does nothing
 REM when there are none, so a staff member never has to run a command.
 "%PY%" backend\manage.py migrate --noinput
+
+REM Picks up any bookings already waiting in the Google Sheet before the
+REM clinic opens for the day. Safe with the feature not set up yet, or with
+REM no internet right now - see backend\clinic\appointment_sheet_poll.py.
+REM run_server.py repeats this every few minutes while the software stays
+REM open, so this is just so a booking does not wait for the next restart.
+"%PY%" backend\manage.py poll_appointment_sheet
 
 start "" http://localhost:%PORT%
 

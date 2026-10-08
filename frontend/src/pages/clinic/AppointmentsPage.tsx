@@ -53,8 +53,12 @@ export function AppointmentsPage() {
   const needsReviewOnly = searchParams.get('needs_review') === '1'
 
   const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('')
-  const [source, setSource] = useState('')
+  // Pre-applied from the URL so a link such as the dashboard's "new from
+  // website" banner (?source=website&status=pending) lands with that filter
+  // already selected, rather than showing everything and making staff set
+  // it again by hand.
+  const [status, setStatus] = useState(() => searchParams.get('status') ?? '')
+  const [source, setSource] = useState(() => searchParams.get('source') ?? '')
   const [walkInOpen, setWalkInOpen] = useState(false)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')

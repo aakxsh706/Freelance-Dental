@@ -15,7 +15,12 @@ def next_weekday(target_weekday: int) -> date:
     return today + timedelta(days=days_ahead)
 
 
-class AvailabilityAndBookingTests(APITestCase):
+class StaffBookingAndListTests(APITestCase):
+    """Appointment creation is staff-only now: the public website's own
+    unauthenticated booking (and the availability endpoint it read) moved to
+    a separate, differently-authenticated service and no longer lives here.
+    """
+
     def setUp(self):
         # A predictable Monday with a single working window, far enough out
         # that "is this slot in the past" never becomes a factor.
@@ -26,8 +31,16 @@ class AvailabilityAndBookingTests(APITestCase):
             end_time="10:00",
             is_active=True,
         )
+        self.staff_user = get_user_model().objects.create_user(
+            username="frontdesk", password="pw12345!"
+        )
+        StaffProfile.objects.create(
+            user=self.staff_user, full_name="Front Desk", role=StaffProfile.Role.RECEPTIONIST
+        )
 
     def _book(self, time="09:00", **overrides):
+        # Creation requires clinic staff now; there is no public caller left.
+        self.client.force_authenticate(self.staff_user)
         payload = {
             "patient_name": "Test Patient",
             "phone": "9999999999",
@@ -40,31 +53,16 @@ class AvailabilityAndBookingTests(APITestCase):
         payload.update(overrides)
         return self.client.post(reverse("appointment-list"), payload, format="json")
 
-    def test_availability_lists_configured_slots(self):
-        response = self.client.get(
-            reverse("availability"), {"date": self.monday.isoformat()}
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        times = [slot["time"] for slot in response.data["slots"]]
-        self.assertEqual(times, ["09:00", "09:30"])
-        self.assertTrue(all(slot["status"] == "available" for slot in response.data["slots"]))
-
-    def test_booking_marks_slot_as_booked(self):
-        self._book()
-        response = self.client.get(
-            reverse("availability"), {"date": self.monday.isoformat()}
-        )
-        slot = next(s for s in response.data["slots"] if s["time"] == "09:00")
-        self.assertEqual(slot["status"], "booked")
-
-    def test_double_booking_is_rejected_with_friendly_message(self):
+    def test_double_booking_is_rejected_with_a_named_conflict(self):
+        """Staff booking surfaces a conflict (409, who holds the slot)
+        rather than the public serializer's plain 400 - that serializer no
+        longer backs this endpoint, so the response shape follows suit."""
         first = self._book()
         self.assertEqual(first.status_code, status.HTTP_201_CREATED)
 
         second = self._book(patient_name="Second Patient")
-        self.assertEqual(second.status_code, status.HTTP_400_BAD_REQUEST)
-        message = str(second.data["appointment_time"][0])
-        self.assertIn("available appointment time", message)
+        self.assertEqual(second.status_code, status.HTTP_409_CONFLICT)
+        self.assertIn("already occupied", second.data["detail"])
 
     def test_cancelled_slot_can_be_rebooked(self):
         first = self._book()
@@ -76,10 +74,6 @@ class AvailabilityAndBookingTests(APITestCase):
 
         second = self._book(patient_name="Second Patient")
         self.assertEqual(second.status_code, status.HTTP_201_CREATED)
-
-    def test_booking_outside_working_hours_is_rejected(self):
-        response = self._book(time="18:00")
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_appointment_list_requires_authentication(self):
         response = self.client.get(reverse("appointment-list"))
@@ -133,19 +127,15 @@ class AvailabilityAndBookingTests(APITestCase):
     def test_no_show_releases_the_slot(self):
         """A missed appointment frees its time, like a cancellation.
 
-        The database constraint and availability.py must agree on this, or a
-        slot shows as free and then refuses the booking.
+        (Previously also checked the public /api/availability/ endpoint
+        reflected this; that endpoint moved out with the public website, so
+        this now checks the only thing that still matters here - the slot
+        is rebookable.)
         """
         first = self._book()
         appointment = Appointment.objects.get(id=first.data["id"])
         appointment.status = Appointment.Status.NO_SHOW
         appointment.save()
-
-        availability = self.client.get(
-            reverse("availability"), {"date": self.monday.isoformat()}
-        )
-        slot = next(s for s in availability.data["slots"] if s["time"] == "09:00")
-        self.assertEqual(slot["status"], "available")
 
         second = self._book(patient_name="Second Patient")
         self.assertEqual(second.status_code, status.HTTP_201_CREATED)

@@ -28,7 +28,6 @@ from .patients import (
 )
 from .public import (
     AuditedTokenObtainPairView,
-    AvailabilityView,
     ClinicSettingsView,
     DentistProfileView,
 )
@@ -40,7 +39,6 @@ __all__ = [
     "AppointmentViewSet",
     "AuditLogViewSet",
     "AuditedTokenObtainPairView",
-    "AvailabilityView",
     "BlockedDateViewSet",
     "ClinicSettingsView",
     "ClinicalVisitViewSet",

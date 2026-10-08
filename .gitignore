@@ -7,3 +7,6 @@ runtime/
 .vercel/
 __pycache__/
 *.pyc
+.vscode/settings.json
+installer/Output/
+release-*.zip
